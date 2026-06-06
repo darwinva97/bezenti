@@ -18,7 +18,7 @@ jobs:
   post:
     runs-on: ubuntu-latest
     env:
-      POST_OUT: ${{ runner.temp }}/post.json
+      POST_OUT: /tmp/post.json
     steps:
       - uses: actions/checkout@v4
 
@@ -67,5 +67,5 @@ jobs:
           curl -sS -X POST "https://bezenti.com/api/admin/send" \
             -H "Authorization: Bearer ${{ secrets.ADMIN_SECRET }}" \
             -H "Content-Type: application/json" \
-            --data-binary @"${{ runner.temp }}/post.json" \
+            --data-binary @/tmp/post.json \
             -w "\nHTTP %{http_code}\n"
