@@ -14,7 +14,19 @@ interface Env {
   ASSETS: Fetcher;
   /** Base de datos de suscriptores de la newsletter. */
   DB: D1Database;
+  // --- SMTP (Stalwart) para la newsletter. `vars` + secreto SMTP_PASSWORD. ---
+  SMTP_HOST: string;
+  SMTP_PORT: string;
+  SMTP_SECURE?: string;
+  SMTP_USER: string;
+  SMTP_PASSWORD: string;
+  SMTP_FROM?: string;
+  SITE_URL?: string;
+  /** Secreto para autorizar el envío manual/cron (/api/admin/send). */
+  ADMIN_SECRET: string;
 }
+
+import { sendNewsletter, type PostByLocale } from "./email";
 
 const LOCALES = ["es", "en"] as const;
 // Si en "/" no hay cookie ni el Accept-Language coincide con un idioma
@@ -157,6 +169,37 @@ async function handleUnsubscribe(env: Env, url: URL): Promise<Response> {
   });
 }
 
+/**
+ * Envío manual de la newsletter (protegido). La Fase 3 (cron) llama a
+ * `sendNewsletter` directamente; este endpoint sirve para pruebas y disparos
+ * manuales. Auth: header `Authorization: Bearer <ADMIN_SECRET>`.
+ * Body JSON: { "post": { "es": {slug,title,description}, "en": {...} } }
+ */
+async function handleAdminSend(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") {
+    return Response.json({ ok: false, error: "method" }, { status: 405 });
+  }
+  if (!env.ADMIN_SECRET || request.headers.get("Authorization") !== `Bearer ${env.ADMIN_SECRET}`) {
+    return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  let body: { post?: PostByLocale };
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ ok: false, error: "bad-request" }, { status: 400 });
+  }
+  const post = body.post;
+  if (!post || (!post.es && !post.en)) {
+    return Response.json({ ok: false, error: "validation" }, { status: 400 });
+  }
+  try {
+    const summary = await sendNewsletter(env, post);
+    return Response.json({ ok: true, ...summary });
+  } catch (e) {
+    return Response.json({ ok: false, error: "send-failed", detail: String(e) }, { status: 502 });
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -171,6 +214,10 @@ export default {
 
     if (url.pathname === "/api/unsubscribe") {
       return handleUnsubscribe(env, url);
+    }
+
+    if (url.pathname === "/api/admin/send") {
+      return handleAdminSend(request, env);
     }
 
     if (url.pathname === "/") {

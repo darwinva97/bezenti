@@ -29,5 +29,16 @@
       "database_name": "bezenti",
       "database_id": "91cc0789-0647-45b5-a4b0-2079802a4c80"
     }
-  ]
+  ],
+  // Config SMTP (Stalwart) para la newsletter. Ajusta host/puerto/usuario aquí.
+  // La contraseña va como SECRETO: `wrangler secret put SMTP_PASSWORD`.
+  // SMTP_SECURE "true" = TLS implícito (465). Pon "false" para STARTTLS (587).
+  "vars": {
+    "SMTP_HOST": "mail.bezenti.com",
+    "SMTP_PORT": "465",
+    "SMTP_SECURE": "true",
+    "SMTP_USER": "newsletter@bezenti.com",
+    "SMTP_FROM": "Bezenti <newsletter@bezenti.com>",
+    "SITE_URL": "https://bezenti.com"
+  }
 }
