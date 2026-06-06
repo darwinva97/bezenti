@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "errores-comunes-en-tiendas-online",
-      "category": "ecommerce",
-      "topics": [
-        "ecommerce",
-        "seo"
-      ],
-      "es": "Cinco errores comunes en tiendas online que te cuestan ventas",
-      "en": "Five common online store mistakes that cost you sales"
-    },
-    {
       "key": "wordpress-o-a-medida",
       "category": "web",
       "topics": [
@@ -296,6 +286,17 @@
       ],
       "es": "Qué es el SEO local y por qué tu negocio lo necesita",
       "en": "What local SEO is and why your business needs it",
+      "publishedAt": "2026-06-06"
+    },
+    {
+      "key": "errores-comunes-en-tiendas-online",
+      "category": "ecommerce",
+      "topics": [
+        "ecommerce",
+        "seo"
+      ],
+      "es": "Cinco errores comunes en tiendas online que te cuestan ventas",
+      "en": "Five common online store mistakes that cost you sales",
       "publishedAt": "2026-06-06"
     }
   ]
