@@ -18,8 +18,5 @@
   },
   "devDependencies": {
     "turbo": "^2.9.16"
-  },
-  "dependencies": {
-    "agent-browser": "^0.27.1"
   }
 }
