@@ -1,0 +1,71 @@
+name: Daily blog post
+
+# Bot diario: Workers AI (Llama) escribe el post es+en, Flux hace la portada,
+# se commitea, se despliega y se envía la newsletter. Todo automático.
+on:
+  schedule:
+    - cron: "0 13 * * *" # 13:00 UTC = 08:00 Perú
+  workflow_dispatch: # disparo manual para probar
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    env:
+      POST_OUT: ${{ runner.temp }}/post.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate post (Workers AI)
+        id: gen
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node apps/web/scripts/generate-daily-post.mjs
+
+      - name: Commit new post
+        if: steps.gen.outputs.generated == 'true'
+        run: |
+          git config user.name "Bezenti Bot"
+          git config user.email "bot@bezenti.com"
+          git add apps/web/src/content/posts apps/web/public/images/posts apps/web/scripts/post-queue.json
+          git commit -m "post: ${{ steps.gen.outputs.title }} [skip ci]"
+          git push origin main
+
+      - name: Build web
+        if: steps.gen.outputs.generated == 'true'
+        run: pnpm --filter web build
+
+      - name: Deploy to Cloudflare
+        if: steps.gen.outputs.generated == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: deploy
+
+      - name: Email subscribers
+        if: steps.gen.outputs.generated == 'true'
+        run: |
+          curl -sS -X POST "https://bezenti.com/api/admin/send" \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --data-binary @"${{ runner.temp }}/post.json" \
+            -w "\nHTTP %{http_code}\n"

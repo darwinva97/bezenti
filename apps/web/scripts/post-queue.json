@@ -1,0 +1,302 @@
+{
+  "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
+  "pending": [
+    {
+      "key": "errores-comunes-en-tiendas-online",
+      "category": "ecommerce",
+      "topics": [
+        "ecommerce",
+        "seo"
+      ],
+      "es": "Cinco errores comunes en tiendas online que te cuestan ventas",
+      "en": "Five common online store mistakes that cost you sales"
+    },
+    {
+      "key": "wordpress-o-a-medida",
+      "category": "web",
+      "topics": [
+        "wordpress",
+        "performance"
+      ],
+      "es": "WordPress o web a medida: cómo decidir para tu negocio",
+      "en": "WordPress or custom: how to decide for your business"
+    },
+    {
+      "key": "por-que-tu-web-carga-lenta",
+      "category": "web",
+      "topics": [
+        "performance",
+        "seo"
+      ],
+      "es": "Por qué tu web carga lenta y cómo arreglarlo",
+      "en": "Why your website loads slowly and how to fix it"
+    },
+    {
+      "key": "automatizar-presupuestos-y-facturas",
+      "category": "automation",
+      "topics": [
+        "automation",
+        "systems"
+      ],
+      "es": "Cómo automatizar presupuestos y facturas en tu negocio",
+      "en": "How to automate quotes and invoices in your business"
+    },
+    {
+      "key": "google-ads-vs-meta-ads",
+      "category": "marketing",
+      "topics": [
+        "marketing"
+      ],
+      "es": "Google Ads o Meta Ads: cuál conviene a tu negocio",
+      "en": "Google Ads or Meta Ads: which suits your business"
+    },
+    {
+      "key": "como-elegir-un-dominio",
+      "category": "servers",
+      "topics": [
+        "domains"
+      ],
+      "es": "Cómo elegir un buen dominio para tu marca",
+      "en": "How to choose a good domain for your brand"
+    },
+    {
+      "key": "correo-profesional-propio-dominio",
+      "category": "servers",
+      "topics": [
+        "email",
+        "domains"
+      ],
+      "es": "Por qué necesitas correo profesional con tu propio dominio",
+      "en": "Why you need professional email on your own domain"
+    },
+    {
+      "key": "que-es-un-crm-y-cuando-lo-necesitas",
+      "category": "systems",
+      "topics": [
+        "systems",
+        "automation"
+      ],
+      "es": "Qué es un CRM y cuándo tu negocio lo necesita",
+      "en": "What a CRM is and when your business needs one"
+    },
+    {
+      "key": "checklist-seo-para-una-web-nueva",
+      "category": "marketing",
+      "topics": [
+        "seo",
+        "performance"
+      ],
+      "es": "Checklist de SEO para lanzar una web nueva",
+      "en": "An SEO checklist for launching a new website"
+    },
+    {
+      "key": "shopify-para-empezar-a-vender",
+      "category": "ecommerce",
+      "topics": [
+        "shopify",
+        "ecommerce"
+      ],
+      "es": "Shopify para empezar a vender online sin complicarte",
+      "en": "Shopify to start selling online without the hassle"
+    },
+    {
+      "key": "bots-de-whatsapp-atencion-cliente",
+      "category": "automation",
+      "topics": [
+        "bots",
+        "automation"
+      ],
+      "es": "Bots de WhatsApp para atención al cliente que sí ayudan",
+      "en": "WhatsApp bots for customer service that actually help"
+    },
+    {
+      "key": "que-mirar-al-contratar-hosting",
+      "category": "servers",
+      "topics": [
+        "hosting",
+        "performance"
+      ],
+      "es": "Qué mirar antes de contratar un hosting web",
+      "en": "What to check before buying web hosting"
+    },
+    {
+      "key": "como-escribir-fichas-de-producto",
+      "category": "ecommerce",
+      "topics": [
+        "ecommerce",
+        "seo"
+      ],
+      "es": "Cómo escribir fichas de producto que venden y posicionan",
+      "en": "How to write product pages that sell and rank"
+    },
+    {
+      "key": "landing-page-que-convierte",
+      "category": "marketing",
+      "topics": [
+        "marketing"
+      ],
+      "es": "Qué hace que una landing page convierta de verdad",
+      "en": "What makes a landing page actually convert"
+    },
+    {
+      "key": "web-corporativa-que-transmite-confianza",
+      "category": "web",
+      "topics": [
+        "seo"
+      ],
+      "es": "Cómo hacer que tu web corporativa transmita confianza",
+      "en": "How to make your corporate website build trust"
+    },
+    {
+      "key": "erp-para-pymes-vale-la-pena",
+      "category": "systems",
+      "topics": [
+        "systems"
+      ],
+      "es": "ERP para pymes: cuándo vale la pena y cuándo no",
+      "en": "ERP for small businesses: when it's worth it and when not"
+    },
+    {
+      "key": "seo-tecnico-explicado-simple",
+      "category": "marketing",
+      "topics": [
+        "seo",
+        "performance"
+      ],
+      "es": "SEO técnico explicado simple para dueños de negocio",
+      "en": "Technical SEO explained simply for business owners"
+    },
+    {
+      "key": "imagenes-optimizadas-web-rapida",
+      "category": "web",
+      "topics": [
+        "performance",
+        "seo"
+      ],
+      "es": "Imágenes optimizadas: el truco para una web más rápida",
+      "en": "Optimized images: the trick to a faster website"
+    },
+    {
+      "key": "integrar-tienda-con-logistica",
+      "category": "ecommerce",
+      "topics": [
+        "ecommerce",
+        "automation"
+      ],
+      "es": "Cómo integrar tu tienda online con la logística de envíos",
+      "en": "How to connect your online store with shipping logistics"
+    },
+    {
+      "key": "email-marketing-para-pymes",
+      "category": "marketing",
+      "topics": [
+        "email",
+        "marketing"
+      ],
+      "es": "Email marketing para pymes: por dónde empezar",
+      "en": "Email marketing for small businesses: where to start"
+    },
+    {
+      "key": "que-es-geo-seo-para-ia",
+      "category": "marketing",
+      "topics": [
+        "seo",
+        "marketing"
+      ],
+      "es": "Qué es GEO: posicionarte en las respuestas de la IA",
+      "en": "What GEO is: showing up in AI answers"
+    },
+    {
+      "key": "copias-de-seguridad-de-tu-web",
+      "category": "servers",
+      "topics": [
+        "hosting"
+      ],
+      "es": "Copias de seguridad de tu web: por qué y cada cuánto",
+      "en": "Website backups: why you need them and how often"
+    },
+    {
+      "key": "automatizar-seguimiento-de-leads",
+      "category": "automation",
+      "topics": [
+        "automation",
+        "marketing"
+      ],
+      "es": "Cómo automatizar el seguimiento de tus leads sin perder el trato",
+      "en": "How to automate lead follow-up without losing the personal touch"
+    },
+    {
+      "key": "migrar-de-wix-a-web-propia",
+      "category": "web",
+      "topics": [
+        "wordpress",
+        "seo"
+      ],
+      "es": "Migrar de Wix o plantillas a una web propia: qué ganas",
+      "en": "Moving from Wix or templates to your own site: what you gain"
+    },
+    {
+      "key": "como-medir-resultados-de-tu-web",
+      "category": "marketing",
+      "topics": [
+        "marketing",
+        "seo"
+      ],
+      "es": "Cómo medir si tu web está dando resultados",
+      "en": "How to measure whether your website is delivering results"
+    },
+    {
+      "key": "accesibilidad-web-por-que-importa",
+      "category": "web",
+      "topics": [
+        "performance",
+        "seo"
+      ],
+      "es": "Accesibilidad web: por qué importa y cómo empezar",
+      "en": "Web accessibility: why it matters and how to start"
+    },
+    {
+      "key": "vender-en-redes-vs-tienda-propia",
+      "category": "ecommerce",
+      "topics": [
+        "ecommerce",
+        "marketing"
+      ],
+      "es": "Vender por redes o tener tienda propia: ventajas de cada una",
+      "en": "Selling on social vs your own store: the upside of each"
+    },
+    {
+      "key": "vps-cuando-pasar-a-servidor-propio",
+      "category": "servers",
+      "topics": [
+        "hosting",
+        "systems"
+      ],
+      "es": "VPS: cuándo conviene pasar a tu propio servidor",
+      "en": "VPS: when it makes sense to move to your own server"
+    },
+    {
+      "key": "ia-en-tu-negocio-por-donde-empezar",
+      "category": "automation",
+      "topics": [
+        "automation",
+        "systems"
+      ],
+      "es": "Inteligencia artificial en tu negocio: por dónde empezar de verdad",
+      "en": "AI in your business: where to actually start"
+    }
+  ],
+  "used": [
+    {
+      "key": "que-es-el-seo-local",
+      "category": "marketing",
+      "topics": [
+        "seo",
+        "marketing"
+      ],
+      "es": "Qué es el SEO local y por qué tu negocio lo necesita",
+      "en": "What local SEO is and why your business needs it",
+      "publishedAt": "2026-06-06"
+    }
+  ]
+}
