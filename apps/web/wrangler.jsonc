@@ -40,5 +40,10 @@
     "SMTP_USER": "newsletter@bezenti.com",
     "SMTP_FROM": "Bezenti <newsletter@bezenti.com>",
     "SITE_URL": "https://bezenti.com"
+  },
+  // Cron diario: procesa la cola `outbox` y envía la newsletter de los posts
+  // nuevos. 13:30 UTC = 08:30 Perú (30 min después de que el bot genere/publique).
+  "triggers": {
+    "crons": ["30 13 * * *"]
   }
 }

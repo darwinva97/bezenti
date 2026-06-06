@@ -64,11 +64,6 @@ jobs:
           workingDirectory: apps/web
           command: deploy
 
-      - name: Email subscribers
-        if: steps.gen.outputs.generated == 'true'
-        run: |
-          curl -sS -X POST "https://bezenti.com/api/admin/send" \
-            -H "Authorization: Bearer ${{ secrets.ADMIN_SECRET }}" \
-            -H "Content-Type: application/json" \
-            --data-binary @/tmp/post.json \
-            -w "\nHTTP %{http_code}\n"
+      # El envío de la newsletter lo hace el Cron Trigger del Worker leyendo la
+      # cola `outbox` (el generador ya encoló el post). Así no llamamos al
+      # endpoint público desde Actions (lo bloquea el WAF de la zona).

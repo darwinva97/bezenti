@@ -200,7 +200,44 @@ async function handleAdminSend(request: Request, env: Env): Promise<Response> {
   }
 }
 
+/**
+ * Procesa la cola `outbox`: por cada post pendiente, envía la newsletter y, si
+ * no hubo fallos, borra la fila. Lo dispara el Cron Trigger (scheduled) y
+ * también la ruta manual /api/admin/process-outbox. El bot diario (GitHub
+ * Actions) solo INSERTA en outbox vía la API de D1, sin llamar a este Worker
+ * (así evita el WAF de la zona).
+ */
+async function processOutbox(env: Env): Promise<{ processed: number; sent: number; failed: number }> {
+  const { results } = await env.DB.prepare(
+    "SELECT id, payload FROM outbox ORDER BY id LIMIT 10",
+  ).all<{ id: number; payload: string }>();
+  let processed = 0;
+  let sent = 0;
+  let failed = 0;
+  for (const row of results ?? []) {
+    let post: PostByLocale;
+    try {
+      post = JSON.parse(row.payload);
+    } catch {
+      await env.DB.prepare("DELETE FROM outbox WHERE id = ?").bind(row.id).run();
+      continue;
+    }
+    const r = await sendNewsletter(env, post);
+    sent += r.sent;
+    failed += r.failed;
+    if (r.failed === 0) {
+      await env.DB.prepare("DELETE FROM outbox WHERE id = ?").bind(row.id).run();
+      processed++;
+    }
+  }
+  return { processed, sent, failed };
+}
+
 export default {
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(processOutbox(env));
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
@@ -218,6 +255,18 @@ export default {
 
     if (url.pathname === "/api/admin/send") {
       return handleAdminSend(request, env);
+    }
+
+    if (url.pathname === "/api/admin/process-outbox") {
+      if (request.headers.get("Authorization") !== `Bearer ${env.ADMIN_SECRET}`) {
+        return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+      }
+      try {
+        const r = await processOutbox(env);
+        return Response.json({ ok: true, ...r });
+      } catch (e) {
+        return Response.json({ ok: false, error: String(e) }, { status: 502 });
+      }
     }
 
     if (url.pathname === "/") {

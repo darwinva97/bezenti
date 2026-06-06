@@ -14,6 +14,7 @@ const ACC = process.env.CF_ACCOUNT_ID;
 const TOK = process.env.CF_API_TOKEN;
 const BASE = "apps/web";
 const QUEUE = `${BASE}/scripts/post-queue.json`;
+const DB_ID = "91cc0789-0647-45b5-a4b0-2079802a4c80"; // D1 `bezenti` (no es secreto)
 const TEXT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const IMG_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 
@@ -163,8 +164,19 @@ async function main() {
   queue.used.push({ ...item, publishedAt: new Date().toISOString().slice(0, 10) });
   writeFileSync(QUEUE, JSON.stringify(queue, null, 2) + "\n");
 
-  const payload = { post: { es: pes, en: pen } };
-  if (process.env.POST_OUT) writeFileSync(process.env.POST_OUT, JSON.stringify(payload));
+  // Encola el post para el envío de la newsletter (lo procesa el Cron del Worker).
+  const payload = { es: pes, en: pen };
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACC}/d1/database/${DB_ID}/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${TOK}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sql: "INSERT INTO outbox (payload, created_at) VALUES (?, ?)",
+      params: [JSON.stringify(payload), String(Date.now())],
+    }),
+  });
+  const jr = await r.json();
+  if (!jr.success) throw new Error("Outbox insert falló: " + JSON.stringify(jr.errors));
+  console.log("Encolado en outbox para envío.");
   if (out) {
     appendFileSync(out, "generated=true\n");
     appendFileSync(out, `key=${item.key}\n`);
