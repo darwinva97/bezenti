@@ -1,0 +1,56 @@
+---
+/**
+ * Fila de servicio del catálogo. Miniatura real a la izquierda (catálogo
+ * concreto, no lista de texto), título + teaser, y flecha. El acento del
+ * título al hover lo marca la categoría (`accentText`, clase LITERAL).
+ */
+interface Props {
+  href: string;
+  title: string;
+  teaser?: string;
+  image?: string;
+  viewLabel: string;
+  /** Clase de color del título al hover, p. ej. "group-hover:text-coral-600". */
+  accentText?: string;
+  index?: number;
+}
+
+const {
+  href,
+  title,
+  teaser,
+  image,
+  viewLabel,
+  accentText = "group-hover:text-brand-600",
+  index = 0,
+} = Astro.props;
+---
+
+<li data-reveal style={`--reveal-delay:${(index % 6) * 50}ms`}>
+  <a
+    href={href}
+    class="group flex items-center gap-4 border-b border-slate-100 py-4 transition-colors hover:bg-slate-50 sm:gap-5 sm:py-5"
+  >
+    {
+      image && (
+        <img
+          src={image}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          class="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-slate-200/70 transition-transform duration-300 group-hover:scale-105 sm:h-16 sm:w-16"
+        />
+      )
+    }
+    <div class="min-w-0 flex-1">
+      <h3 class:list={["font-semibold text-slate-900 transition-colors sm:text-lg", accentText]}>
+        {title}
+      </h3>
+      {teaser && <p class="mt-0.5 line-clamp-1 text-sm text-slate-500">{teaser}</p>}
+    </div>
+    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-300 text-slate-400 transition-colors group-hover:border-brand-600 group-hover:bg-brand-600 group-hover:text-white">
+      <span class="transition-transform group-hover:translate-x-0.5" aria-hidden="true">→</span>
+      <span class="sr-only">{viewLabel}</span>
+    </span>
+  </a>
+</li>

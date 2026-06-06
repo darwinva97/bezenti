@@ -1,0 +1,46 @@
+---
+import type { Locale } from "../i18n/config";
+import { topics, topicName, type TopicKey } from "../i18n/topics";
+import { topicHref } from "../lib/urls";
+
+interface Props {
+  locale: Locale;
+  topics: TopicKey[];
+}
+
+const { locale, topics: items } = Astro.props;
+
+// Mini-acentos rotativos (estilo latevaweb): cada topic toma un color del set
+// de forma estable según su posición en la taxonomía. Clases literales para que
+// Tailwind las detecte.
+const ACCENTS = [
+  "bg-brand-100 text-brand-700 hover:bg-brand-600 hover:text-white",
+  "bg-coral-100 text-coral-700 hover:bg-coral-600 hover:text-white",
+  "bg-amber-100 text-amber-700 hover:bg-amber-600 hover:text-white",
+  "bg-teal-100 text-teal-700 hover:bg-teal-600 hover:text-white",
+  "bg-success-100 text-success-700 hover:bg-success-600 hover:text-white",
+];
+
+function accentFor(key: TopicKey): string {
+  const i = topics.findIndex((t) => t.key === key);
+  return ACCENTS[((i < 0 ? 0 : i) % ACCENTS.length)]!;
+}
+---
+
+{
+  items.length > 0 && (
+    <div class="flex flex-wrap gap-2">
+      {items.map((t) => (
+        <a
+          href={topicHref(locale, t)}
+          class:list={[
+            "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+            accentFor(t),
+          ]}
+        >
+          #{topicName(locale, t)}
+        </a>
+      ))}
+    </div>
+  )
+}

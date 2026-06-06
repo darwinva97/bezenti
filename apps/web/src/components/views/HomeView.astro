@@ -1,0 +1,760 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import MediaCard from "../MediaCard.astro";
+import {
+    getAlternateLinks,
+    getPath,
+    useTranslations,
+    type Locale,
+} from "../../i18n/utils";
+import { serviceHref, projectHref, postHref } from "../../lib/urls";
+import {
+    categoriesByScope,
+    childrenOf,
+    categoryName,
+    type CategoryKey,
+    type ProjectCategoryKey,
+} from "../../i18n/categories";
+
+interface Props {
+    locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+
+const services = (await getCollection("services"))
+    .filter((s) => s.data.locale === locale && !s.data.draft)
+    .sort((a, b) => a.data.order - b.data.order);
+
+const allProjects = (await getCollection("projects")).filter(
+    (p) => p.data.locale === locale && !p.data.draft,
+);
+// Destacados primero, luego el resto; máximo 4 en el home.
+const projects = [...allProjects]
+    .sort((a, b) => Number(b.data.featured) - Number(a.data.featured))
+    .slice(0, 4);
+const featuredProject = projects[0];
+const restProjects = projects.slice(1, 4);
+
+const posts = (await getCollection("posts"))
+    .filter((p) => p.data.locale === locale && !p.data.draft)
+    .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime())
+    .slice(0, 3);
+
+const fmt = new Intl.DateTimeFormat(locale, { dateStyle: "long" });
+
+// Acentos de texto rotativos (mismo set que los chips de topics).
+const ACCENT_TEXT = [
+    "text-brand-500",
+    "text-coral-500",
+    "text-amber-500",
+    "text-teal-500",
+];
+
+// Copys estructurados (se quedan aquí porque son listas de objetos).
+const benefits: Record<Locale, { title: string; body: string }[]> = {
+    es: [
+        {
+            title: "Diseño a medida",
+            body: "Nada de plantillas genéricas: cada proyecto se diseña para tu negocio y tu cliente.",
+        },
+        {
+            title: "Todo en un equipo",
+            body: "Web, hosting, correo, SEO, marketing y bots. Un único interlocutor, cero traspasos.",
+        },
+        {
+            title: "Orientado a resultados",
+            body: "Construimos para convertir y posicionar, no solo para que se vea bonito.",
+        },
+        {
+            title: "Cerca de ti",
+            body: "Soporte directo y trato cercano, en tu idioma y tu zona horaria.",
+        },
+    ],
+    en: [
+        {
+            title: "Custom design",
+            body: "No generic templates: every project is designed around your business and your customer.",
+        },
+        {
+            title: "One team for everything",
+            body: "Web, hosting, email, SEO, marketing and bots. A single point of contact, zero handoffs.",
+        },
+        {
+            title: "Built for results",
+            body: "We build to convert and to rank, not just to look pretty.",
+        },
+        {
+            title: "Close to you",
+            body: "Direct support and a personal relationship, in your language and time zone.",
+        },
+    ],
+};
+
+const steps: Record<Locale, { title: string; body: string }[]> = {
+    es: [
+        {
+            title: "Estudio",
+            body: "Analizamos tu negocio, tu competencia y tus objetivos.",
+        },
+        {
+            title: "Diseño",
+            body: "Definimos estructura y diseño orientados a conversión.",
+        },
+        {
+            title: "Desarrollo",
+            body: "Programamos una web rápida, accesible y fácil de mantener.",
+        },
+        {
+            title: "Lanzamiento y SEO",
+            body: "Publicamos, medimos y optimizamos para buscadores.",
+        },
+        {
+            title: "Crecimiento",
+            body: "Marketing, automatizaciones y mejora continua.",
+        },
+    ],
+    en: [
+        {
+            title: "Discovery",
+            body: "We analyse your business, your competitors and your goals.",
+        },
+        {
+            title: "Design",
+            body: "We define a conversion-focused structure and design.",
+        },
+        {
+            title: "Build",
+            body: "We develop a fast, accessible and maintainable website.",
+        },
+        {
+            title: "Launch & SEO",
+            body: "We ship, measure and optimise for search engines.",
+        },
+        {
+            title: "Growth",
+            body: "Marketing, automations and continuous improvement.",
+        },
+    ],
+};
+
+// ─── "Qué hacemos": SOLO categorías de servicio padre (sin `parent`), con su
+// total de servicios (directos + de sus subcategorías). Cada tarjeta enlaza a
+// su sección anclada del índice de servicios (/servicios#<key>).
+const parentCats = categoriesByScope("global").filter((c) => !c.parent);
+const serviceCountOf = (key: CategoryKey): number => {
+    const direct = services.filter((s) => s.data.category === key).length;
+    const viaChildren = childrenOf(key).reduce(
+        (n, child) =>
+            n + services.filter((s) => s.data.category === child.key).length,
+        0,
+    );
+    return direct + viaChildren;
+};
+const categoryCards = parentCats
+    .map((cat) => ({ cat, count: serviceCountOf(cat.key as CategoryKey) }))
+    .filter((c) => c.count > 0);
+
+// Acento por categoría padre (clases LITERALES para que Tailwind las detecte).
+// `name` colorea el nombre al hover; `dot` es el punto de acento siempre visible.
+const CATEGORY_ACCENT: Record<string, { name: string; dot: string }> = {
+    web: { name: "group-hover:text-brand-600", dot: "bg-brand-500" },
+    ecommerce: { name: "group-hover:text-coral-600", dot: "bg-coral-500" },
+    marketing: { name: "group-hover:text-amber-700", dot: "bg-amber-500" },
+    automation: { name: "group-hover:text-teal-600", dot: "bg-teal-500" },
+    systems: { name: "group-hover:text-success-600", dot: "bg-success-500" },
+    servers: { name: "group-hover:text-brand-600", dot: "bg-brand-500" },
+};
+// Chips de keyword reales por categoría: el lenguaje concreto del catálogo, no
+// una descripción genérica. Demuestra el alcance de un vistazo.
+const CATEGORY_TAGS: Record<Locale, Record<string, string[]>> = {
+    es: {
+        web: ["WordPress", "Corporativa", "A medida", "Institucional"],
+        ecommerce: ["WooCommerce", "Shopify", "A medida"],
+        marketing: ["SEO", "SEM", "Google Ads", "Meta Ads", "GEO"],
+        automation: ["Bots", "Workflows"],
+        systems: ["CRM", "ERP", "Logística"],
+        servers: ["Hosting", "Dominios", "Correo"],
+    },
+    en: {
+        web: ["WordPress", "Corporate", "Custom", "Institutional"],
+        ecommerce: ["WooCommerce", "Shopify", "Custom"],
+        marketing: ["SEO", "SEM", "Google Ads", "Meta Ads", "GEO"],
+        automation: ["Bots", "Workflows"],
+        systems: ["CRM", "ERP", "Logistics"],
+        servers: ["Hosting", "Domains", "Email"],
+    },
+};
+const countLabel = (n: number) =>
+    locale === "es"
+        ? `${n} ${n === 1 ? "servicio" : "servicios"}`
+        : `${n} ${n === 1 ? "service" : "services"}`;
+
+// Color de acento para el claim de cada motivo "Por qué Bezenti" (uno por motivo,
+// deliberado, sobre fondo claro con contraste verificado).
+const WHY_ACCENT_TEXT = [
+    "text-brand-600",
+    "text-coral-600",
+    "text-amber-700",
+    "text-teal-600",
+];
+
+const whyThesis =
+    locale === "es"
+        ? "Una sola agencia que diseña, programa, aloja y hace crecer tu proyecto."
+        : "One agency that designs, builds, hosts and grows your project.";
+const whyLead =
+    locale === "es"
+        ? "Sin traspasos entre proveedores, sin culpas cruzadas. Un equipo responsable de que el resultado funcione."
+        : "No handoffs between vendors, no finger-pointing. One team accountable for results that work.";
+const processLead =
+    locale === "es"
+        ? "Un método claro de principio a fin, sin sorpresas en el camino."
+        : "A clear method from start to finish, with no surprises along the way.";
+
+const why = benefits[locale];
+const process = steps[locale];
+const scrollLabel = locale === "es" ? "Descubre más" : "Scroll to explore";
+const featuredLabel =
+    locale === "es" ? "Proyecto destacado" : "Featured project";
+const readLabel = locale === "es" ? "Leer artículo" : "Read article";
+---
+
+<Layout
+    locale={locale}
+    activeNav="home"
+    title={t("home.title")}
+    description={t("home.subtitle")}
+    alternates={getAlternateLinks("home")}
+    heroOverlay
+    flushFooter
+>
+    {
+        /* ═══ 1 · HERO — editorial a sangre completa, alineado a la izquierda ═══ */
+    }
+    <section
+        slot="hero"
+        class="relative isolate flex min-h-[88vh] items-end overflow-hidden bg-slate-950 text-white"
+    >
+        <img
+            src="/images/hero.jpg"
+            alt=""
+            aria-hidden="true"
+            class="absolute inset-0 -z-10 h-full w-full object-cover opacity-45"
+        />
+        {
+            /* Degradado direccional: más oscuro a la izquierda, donde va el texto. */
+        }
+        <div
+            class="absolute inset-0 -z-10 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/40"
+        >
+        </div>
+        <div
+            class="absolute inset-0 -z-10 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/30"
+        >
+        </div>
+
+        <div
+            class="mx-auto w-full max-w-7xl px-4 pb-14 pt-36 sm:px-6 sm:pb-20 sm:pt-44 lg:px-8"
+        >
+            <div class="max-w-3xl">
+                <h1
+                    data-reveal
+                    class="u-display text-[clamp(2.5rem,1.1rem+5.2vw,4.75rem)] font-bold leading-[1.02] tracking-[-0.03em] text-balance"
+                >
+                    {t("home.title")}
+                </h1>
+                <p
+                    data-reveal
+                    style="--reveal-delay:90ms"
+                    class="mt-6 max-w-xl text-lg leading-relaxed text-slate-300"
+                >
+                    {t("home.subtitle")}
+                </p>
+                <div
+                    data-reveal
+                    style="--reveal-delay:170ms"
+                    class="mt-9 flex flex-wrap gap-3"
+                >
+                    <a
+                        href={getPath(locale, "contact")}
+                        class="inline-flex items-center gap-2 rounded-full bg-brand-600 px-7 py-3.5 font-medium text-white shadow-lg shadow-brand-600/25 transition-colors hover:bg-brand-500"
+                    >
+                        {t("home.cta")}
+                    </a>
+                    <a
+                        href={getPath(locale, "portfolio")}
+                        class="inline-flex items-center gap-2 rounded-full border border-white/30 px-7 py-3.5 font-medium text-white backdrop-blur-sm transition-colors hover:border-white hover:bg-white hover:text-slate-900"
+                    >
+                        {t("home.hero.ctaSecondary")}
+                    </a>
+                </div>
+            </div>
+
+            {
+                /* Tira de capacidades: enlaces a servicios, doble función SEO + carácter. */
+            }
+            <ul
+                data-reveal
+                style="--reveal-delay:260ms"
+                class="mt-12 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/15 pt-6 text-sm text-slate-400"
+            >
+                {
+                    services.slice(0, 7).map((s) => (
+                        <li>
+                            <a
+                                href={serviceHref(locale, s.data.slug)}
+                                class="transition-colors hover:text-white"
+                            >
+                                {s.data.title}
+                            </a>
+                        </li>
+                    ))
+                }
+            </ul>
+        </div>
+
+        <span
+            class="pointer-events-none absolute bottom-6 right-6 hidden items-center gap-2 text-xs uppercase tracking-widest text-slate-400 sm:flex"
+        >
+            {scrollLabel}
+            <span
+                class="block h-8 w-px bg-gradient-to-b from-slate-400 to-transparent"
+            ></span>
+        </span>
+    </section>
+
+    {
+        /* ═══ 2 · QUÉ HACEMOS — índice editorial de capacidades, no rejilla de tarjetas ═══ */
+    }
+    <section class="py-16 sm:py-20">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+            <h2
+                class="u-display max-w-md text-3xl font-bold text-slate-900 sm:text-4xl"
+            >
+                {t("home.services.title")}
+            </h2>
+            <a
+                href={getPath(locale, "services")}
+                class="group inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700"
+            >
+                {t("home.services.cta")}
+                <span
+                    class="transition-transform group-hover:translate-x-0.5"
+                    aria-hidden="true">→</span
+                >
+            </a>
+        </div>
+        <p class="mt-2 max-w-xl text-slate-600">
+            {t("home.services.subtitle")}
+        </p>
+
+        {
+            /* Directorio: una fila por familia. Nombre grande + keywords reales del
+        catálogo + recuento. Al pasar el cursor se ilumina la fila y el nombre
+        toma el acento de su familia. Sin tarjetas, sin iconos decorativos. */
+        }
+        <div
+            data-reveal
+            class="mt-10 overflow-hidden rounded-3xl border border-slate-200 bg-white"
+        >
+            {
+                categoryCards.map(({ cat, count }) => (
+                    <a
+                        href={`${getPath(locale, "services")}#${cat.key}`}
+                        class="group relative flex flex-col gap-3 border-t border-slate-100 px-5 py-6 transition-colors first:border-t-0 hover:bg-slate-50 sm:flex-row sm:items-center sm:gap-8 sm:px-7"
+                    >
+                        <div class="flex items-center gap-3 sm:w-60 sm:shrink-0">
+                            <span
+                                class:list={[
+                                    "h-2.5 w-2.5 shrink-0 rounded-full",
+                                    CATEGORY_ACCENT[cat.key].dot,
+                                ]}
+                            />
+                            <h3
+                                class:list={[
+                                    "u-display text-2xl font-bold leading-none text-slate-900 transition-colors sm:text-[1.75rem]",
+                                    CATEGORY_ACCENT[cat.key].name,
+                                ]}
+                            >
+                                {categoryName(
+                                    locale,
+                                    cat.key as ProjectCategoryKey,
+                                )}
+                            </h3>
+                        </div>
+                        <ul class="flex flex-1 flex-wrap gap-x-2 gap-y-1.5">
+                            {CATEGORY_TAGS[locale][cat.key].map((tag) => (
+                                <li class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors group-hover:bg-white">
+                                    {tag}
+                                </li>
+                            ))}
+                        </ul>
+                        <div class="flex items-center gap-4 sm:shrink-0">
+                            <span class="text-sm font-medium tabular-nums text-slate-400">
+                                {countLabel(count)}
+                            </span>
+                            <span
+                                class:list={[
+                                    "text-xl leading-none text-slate-300 transition-all group-hover:translate-x-1",
+                                    CATEGORY_ACCENT[cat.key].name,
+                                ]}
+                                aria-hidden="true"
+                            >
+                                →
+                            </span>
+                        </div>
+                    </a>
+                ))
+            }
+        </div>
+    </section>
+
+    {
+        /* ═══ 3 · INTRO — split asimétrico con panel de acento tras la imagen ═══ */
+    }
+    <section
+        class="grid grid-cols-1 items-center gap-12 py-16 sm:py-20 lg:grid-cols-2 lg:gap-16"
+    >
+        <div data-reveal="scale" class="relative">
+            {
+                /* Panel de marca desplazado tras la imagen (profundidad sin tarjeta). */
+            }
+            <div
+                class="absolute -bottom-4 -right-4 -z-10 h-full w-full rounded-3xl bg-brand-100 sm:-bottom-6 sm:-right-6"
+            >
+            </div>
+            <img
+                src="/images/agency.jpg"
+                alt={t("home.intro.title")}
+                width="1200"
+                height="900"
+                loading="lazy"
+                decoding="async"
+                class="aspect-[4/3] w-full rounded-3xl object-cover shadow-xl shadow-slate-900/10"
+            />
+        </div>
+        <div data-reveal>
+            <h2 class="u-display text-3xl font-bold text-slate-900 sm:text-4xl">
+                {t("home.intro.title")}
+            </h2>
+            <p class="mt-5 text-lg leading-relaxed text-slate-600">
+                {t("home.intro.body")}
+            </p>
+            <a
+                href={getPath(locale, "contact")}
+                class="mt-7 inline-flex items-center gap-2 rounded-full bg-slate-900 px-7 py-3.5 font-medium text-white transition-colors hover:bg-slate-800"
+            >
+                {t("home.intro.cta")}
+                <span aria-hidden="true">→</span>
+            </a>
+        </div>
+    </section>
+
+    {
+        /* ═══ 4 · POR QUÉ — manifiesto tipográfico: tesis fija + claims con acento ═══ */
+    }
+    <section
+        class="grid gap-12 border-t border-slate-200 py-16 sm:py-20 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20"
+    >
+        <div data-reveal class="lg:sticky lg:top-28 lg:self-start">
+            <h2 class="u-display text-3xl font-bold text-slate-900 sm:text-4xl">
+                {t("home.why.title")}
+            </h2>
+            <p
+                class="u-display mt-6 text-balance text-2xl font-bold leading-tight text-slate-900 sm:text-[1.75rem]"
+            >
+                {whyThesis}
+            </p>
+            <p class="mt-5 max-w-md text-pretty leading-relaxed text-slate-600">
+                {whyLead}
+            </p>
+            <a
+                href={getPath(locale, "contact")}
+                class="group mt-8 inline-flex items-center gap-2 text-base font-medium text-brand-600 transition-colors hover:text-brand-700"
+            >
+                {t("home.cta")}
+                <span
+                    class="transition-transform group-hover:translate-x-1"
+                    aria-hidden="true">→</span
+                >
+            </a>
+        </div>
+
+        <div>
+            {
+                why.map((b, i) => (
+                    <div
+                        data-reveal
+                        style={`--reveal-delay:${(i % 2) * 80}ms`}
+                        class="border-t border-slate-200 py-8 first:border-t-0 first:pt-0 last:pb-0"
+                    >
+                        <h3
+                            class:list={[
+                                "u-display text-[1.6rem] font-bold leading-tight sm:text-3xl",
+                                WHY_ACCENT_TEXT[i % WHY_ACCENT_TEXT.length],
+                            ]}
+                        >
+                            {b.title}
+                        </h3>
+                        <p class="mt-3 max-w-xl text-lg leading-relaxed text-slate-600">
+                            {b.body}
+                        </p>
+                    </div>
+                ))
+            }
+        </div>
+    </section>
+
+    {/* ═══ 5 · PROCESO — banda oscura a sangre completa con timeline ═══ */}
+    <section
+        class="mx-[calc(50%-50vw)] w-screen bg-slate-950 py-16 text-white sm:py-24"
+    >
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="max-w-lg">
+                <h2 class="u-display text-3xl font-bold sm:text-4xl">
+                    {t("home.process.title")}
+                </h2>
+                <p class="mt-4 leading-relaxed text-slate-400">{processLead}</p>
+            </div>
+            <ol
+                class="mt-14 grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-5"
+            >
+                {
+                    process.map((step, i) => (
+                        <li
+                            data-reveal
+                            style={`--reveal-delay:${i * 80}ms`}
+                            class="group relative"
+                        >
+                            {/* Numeral protagonista (la secuencia ES la información) + línea de
+                  avance hacia el siguiente paso. */}
+                            <div class="flex items-center gap-4">
+                                <span
+                                    class:list={[
+                                        "u-display text-6xl font-bold leading-none tabular-nums transition-transform duration-300 group-hover:-translate-y-1 sm:text-7xl",
+                                        ACCENT_TEXT[i % ACCENT_TEXT.length],
+                                    ]}
+                                >
+                                    {i + 1}
+                                </span>
+                                {i < process.length - 1 && (
+                                    <span
+                                        class="hidden h-px flex-1 bg-gradient-to-r from-white/30 to-white/0 lg:block"
+                                        aria-hidden="true"
+                                    />
+                                )}
+                            </div>
+                            <h3 class="mt-6 text-lg font-semibold">
+                                {step.title}
+                            </h3>
+                            <p class="mt-1.5 text-sm leading-relaxed text-slate-400">
+                                {step.body}
+                            </p>
+                        </li>
+                    ))
+                }
+            </ol>
+            <a
+                href={getPath(locale, "contact")}
+                class="mt-12 inline-flex items-center gap-2 rounded-full bg-brand-600 px-7 py-3.5 font-medium text-white transition-colors hover:bg-brand-500"
+            >
+                {t("home.process.cta")}
+                <span aria-hidden="true">→</span>
+            </a>
+        </div>
+    </section>
+
+    {/* ═══ 6 · PORTAFOLIO — destacado horizontal + resto en rejilla ═══ */}
+    <section class="py-16 sm:py-20">
+        <div class="flex items-end justify-between">
+            <h2 class="u-display text-3xl font-bold text-slate-900 sm:text-4xl">
+                {t("home.portfolio.title")}
+            </h2>
+            <a
+                href={getPath(locale, "portfolio")}
+                class="group inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700"
+            >
+                {t("home.portfolio.cta")}
+                <span
+                    class="transition-transform group-hover:translate-x-0.5"
+                    aria-hidden="true">→</span
+                >
+            </a>
+        </div>
+
+        {
+            featuredProject && (
+                <a
+                    href={projectHref(
+                        locale,
+                        featuredProject.data.category as ProjectCategoryKey,
+                        featuredProject.data.slug,
+                    )}
+                    data-reveal
+                    class="group mt-8 grid overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-lg md:grid-cols-2"
+                >
+                    <div class="relative aspect-[16/10] overflow-hidden bg-slate-100 md:aspect-auto">
+                        {featuredProject.data.image && (
+                            <img
+                                src={featuredProject.data.image}
+                                alt={featuredProject.data.imageAlt ?? ""}
+                                loading="lazy"
+                                decoding="async"
+                                class="h-full w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
+                            />
+                        )}
+                    </div>
+                    <div class="flex flex-col justify-center p-7 sm:p-10">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-brand-600">
+                            {featuredLabel}
+                        </span>
+                        <h3 class="mt-3 text-2xl font-bold text-slate-900 sm:text-3xl">
+                            {featuredProject.data.title}
+                        </h3>
+                        <p class="mt-3 text-slate-600">
+                            {featuredProject.data.description}
+                        </p>
+                        <span class="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600">
+                            {categoryName(
+                                locale,
+                                featuredProject.data
+                                    .category as ProjectCategoryKey,
+                            )}
+                            <span
+                                class="transition-transform group-hover:translate-x-0.5"
+                                aria-hidden="true"
+                            >
+                                →
+                            </span>
+                        </span>
+                    </div>
+                </a>
+            )
+        }
+
+        {
+            restProjects.length > 0 && (
+                <div class="mt-6 grid gap-6 sm:grid-cols-3">
+                    {restProjects.map((p, i) => (
+                        <MediaCard
+                            href={projectHref(
+                                locale,
+                                p.data.category as ProjectCategoryKey,
+                                p.data.slug,
+                            )}
+                            title={p.data.title}
+                            description={p.data.description}
+                            image={p.data.cardImage ?? p.data.image}
+                            imageAlt={p.data.imageAlt}
+                            eyebrow={categoryName(
+                                locale,
+                                p.data.category as ProjectCategoryKey,
+                            )}
+                            reveal
+                            revealDelay={(i % 3) * 80}
+                        />
+                    ))}
+                </div>
+            )
+        }
+    </section>
+
+    {/* ═══ 7 · BLOG — lista editorial con índice, sin tarjetas ═══ */}
+    {
+        posts.length > 0 && (
+            <section class="border-t border-slate-200 py-16 sm:py-20">
+                <div class="flex items-end justify-between">
+                    <h2 class="u-display text-3xl font-bold text-slate-900 sm:text-4xl">
+                        {t("home.blog.title")}
+                    </h2>
+                    <a
+                        href={getPath(locale, "blog")}
+                        class="group inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700"
+                    >
+                        {t("home.blog.cta")}
+                        <span
+                            class="transition-transform group-hover:translate-x-0.5"
+                            aria-hidden="true"
+                        >
+                            →
+                        </span>
+                    </a>
+                </div>
+
+                <ul class="mt-8 divide-y divide-slate-200 border-t border-slate-200">
+                    {posts.map((p, i) => (
+                        <li
+                            data-reveal
+                            style={`--reveal-delay:${(i % 3) * 80}ms`}
+                        >
+                            <a
+                                href={postHref(locale, p.data.slug)}
+                                class="group grid items-baseline gap-x-6 gap-y-2 py-7 sm:grid-cols-[auto_1fr_auto]"
+                            >
+                                <span class="text-sm font-semibold tabular-nums text-slate-400">
+                                    {String(i + 1).padStart(2, "0")}
+                                </span>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-slate-900 transition-colors group-hover:text-brand-600 sm:text-2xl">
+                                        {p.data.title}
+                                    </h3>
+                                    <p class="mt-1.5 line-clamp-2 text-slate-600">
+                                        {p.data.description}
+                                    </p>
+                                </div>
+                                <span class="flex items-center gap-3 text-sm text-slate-500">
+                                    <time
+                                        datetime={p.data.pubDate.toISOString()}
+                                    >
+                                        {fmt.format(p.data.pubDate)}
+                                    </time>
+                                    <span
+                                        class="hidden text-brand-600 transition-transform group-hover:translate-x-1 sm:inline"
+                                        aria-hidden="true"
+                                    >
+                                        →
+                                    </span>
+                                    <span class="sr-only">{readLabel}</span>
+                                </span>
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            </section>
+        )
+    }
+
+    {
+        /* ═══ 8 · CTA FINAL — banda de marca a sangre, tipografía sobredimensionada ═══ */
+    }
+    <section
+        data-reveal="scale"
+        class="mx-[calc(50%-50vw)] mt-4 w-screen overflow-hidden bg-brand-600 py-20 text-white sm:py-28"
+    >
+        <div
+            class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_50%_-20%,var(--color-brand-400),transparent_60%)] opacity-70"
+            aria-hidden="true"
+        >
+        </div>
+        <div class="mx-auto max-w-3xl px-4 text-center sm:px-6">
+            <h2
+                class="u-display text-[clamp(2.25rem,1rem+4.6vw,4rem)] font-bold leading-[1.05] tracking-[-0.03em] text-balance"
+            >
+                {t("home.final.title")}
+            </h2>
+            <p class="mx-auto mt-5 max-w-xl text-lg text-brand-50">
+                {t("home.final.subtitle")}
+            </p>
+            <a
+                href={getPath(locale, "contact")}
+                class="mt-9 inline-flex items-center gap-2 rounded-full bg-white px-8 py-4 text-lg font-medium text-brand-700 shadow-xl shadow-brand-900/25 transition-transform hover:scale-[1.02]"
+            >
+                {t("home.cta")}
+                <span aria-hidden="true">→</span>
+            </a>
+        </div>
+    </section>
+</Layout>

@@ -1,0 +1,220 @@
+---
+import "../styles/global.css";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import Breadcrumbs from "../components/Breadcrumbs.astro";
+import { defaultLocale, type Locale } from "../i18n/config";
+import type { RouteKey } from "../i18n/routes";
+
+export interface Crumb {
+    label: string;
+    href?: string;
+}
+
+interface Props {
+    locale: Locale;
+    title: string;
+    description?: string;
+    /** Sección activa para resaltar en el menú. */
+    activeNav?: RouteKey;
+    /** Enlaces hreflang (mismo recurso en cada idioma). */
+    alternates: { locale: Locale; href: string }[];
+    /** Migas de pan (también se emiten como BreadcrumbList JSON-LD). */
+    breadcrumbs?: Crumb[];
+    /** Tipo OpenGraph: "website" (por defecto) o "article" (posts/proyectos). */
+    ogType?: "website" | "article";
+    /** Imagen OG específica de la página (ruta del sitio o URL absoluta). */
+    image?: string;
+    /**
+     * Si es true, el header se superpone TRANSPARENTE sobre el contenido del slot
+     * `hero` (comparten fondo) y se vuelve sólido al hacer scroll. Úsalo en
+     * páginas con un hero a sangre completa y fondo oscuro.
+     */
+    heroOverlay?: boolean;
+    /**
+     * Si es true, el contenido termina pegado al footer (sin separación
+     * inferior). Úsalo en páginas cuyo último bloque es una banda a sangre
+     * completa que debe tocar el footer (p. ej. el CTA final del home). Por
+     * defecto se deja aire entre el contenido y el footer.
+     */
+    flushFooter?: boolean;
+}
+
+const {
+    locale,
+    title,
+    description,
+    activeNav,
+    alternates,
+    breadcrumbs = [],
+    ogType = "website",
+    image,
+    heroOverlay = false,
+    flushFooter = false,
+} = Astro.props;
+
+// Normaliza sin trailing slash (salvo raíz) para que canonical y hreflang
+// coincidan exactamente.
+const canonicalPath = Astro.url.pathname.replace(/\/+$/, "") || "/";
+const canonical = new URL(canonicalPath, Astro.site);
+const xDefault =
+    alternates.find((a) => a.locale === defaultLocale) ?? alternates[0];
+
+const fullTitle = `${title} · Bezenti`;
+const ogImage = new URL(image ?? "/og-default.png", Astro.site);
+const ogLocaleMap: Record<Locale, string> = { es: "es_ES", en: "en_US" };
+const altLocales = alternates.map((a) => a.locale).filter((l) => l !== locale);
+---
+
+<!doctype html>
+<html lang={locale} class="h-full">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{fullTitle}</title>
+        {description && <meta name="description" content={description} />}
+        <link rel="canonical" href={canonical} />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        {
+            /* Fuente de marca de los titulares: precarga para evitar el FOUT del hero. */
+        }
+        <link
+            rel="preload"
+            href="/fonts/Bezenti-Regular.woff2"
+            as="font"
+            type="font/woff2"
+            crossorigin
+        />
+        {
+            alternates.map(({ locale: l, href }) => (
+                <link
+                    rel="alternate"
+                    hreflang={l}
+                    href={new URL(href, Astro.site)}
+                />
+            ))
+        }
+        {
+            xDefault && (
+                <link
+                    rel="alternate"
+                    hreflang="x-default"
+                    href={new URL(xDefault.href, Astro.site)}
+                />
+            )
+        }
+
+        {/* OpenGraph */}
+        <meta property="og:site_name" content="Bezenti" />
+        <meta property="og:type" content={ogType} />
+        <meta property="og:title" content={fullTitle} />
+        {
+            description && (
+                <meta property="og:description" content={description} />
+            )
+        }
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:locale" content={ogLocaleMap[locale]} />
+        {
+            altLocales.map((l) => (
+                <meta property="og:locale:alternate" content={ogLocaleMap[l]} />
+            ))
+        }
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={fullTitle} />
+        {
+            description && (
+                <meta name="twitter:description" content={description} />
+            )
+        }
+        <meta name="twitter:image" content={ogImage} />
+    </head>
+    <body
+        class="flex min-h-full flex-col bg-slate-50 text-slate-800 antialiased"
+    >
+        <Header
+            locale={locale}
+            activeNav={activeNav}
+            alternates={alternates}
+            overlay={heroOverlay}
+        />
+        {
+            /* Hero a sangre completa (opcional). El header transparente se superpone aquí. */
+        }
+        <slot name="hero" />
+        <main
+            class:list={[
+                "mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 lg:px-8",
+                // Sin hero: deja hueco para el header fijo. Con hero: el hero ya
+                // reserva ese espacio con su propio padding superior.
+                heroOverlay ? "pt-10" : "pt-24",
+                // Aire antes del footer, salvo cuando la página termina en una
+                // banda a sangre completa que debe tocarlo (home).
+                !flushFooter && "pb-16 sm:pb-24",
+            ]}
+        >
+            {breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
+            <slot />
+        </main>
+        <Footer locale={locale} />
+
+        {
+            /*
+      Reveal de entrada DIRIGIDO POR SCROLL. El contenido es visible por defecto
+      (CSS en global.css); este script solo "activa" la animación si el usuario
+      NO pide reduce-motion y hay soporte de IntersectionObserver. Cada
+      [data-reveal] se anima al entrar en el viewport. No hay temporizador que
+      revele de antemano: la animación ocurre exactamente cuando la sección es
+      visible al hacer scroll. Seguridad: revela todo antes de imprimir, al
+      ocultar la pestaña, o si no hay IntersectionObserver, para no dejar nada
+      en blanco en renders headless/print.
+    */
+        }
+        <script is:inline>
+            (function () {
+                var motionOk = window.matchMedia(
+                    "(prefers-reduced-motion: no-preference)",
+                ).matches;
+                var els = document.querySelectorAll("[data-reveal]");
+                if (!els.length) return;
+
+                function revealAll() {
+                    els.forEach(function (el) {
+                        el.classList.add("is-visible");
+                    });
+                }
+
+                // Sin motion o sin IO: dejar todo visible (el CSS ya lo está) y salir.
+                if (!motionOk || !("IntersectionObserver" in window)) return;
+
+                document.documentElement.classList.add("reveal-on");
+
+                var io = new IntersectionObserver(
+                    function (entries) {
+                        entries.forEach(function (entry) {
+                            if (entry.isIntersecting) {
+                                entry.target.classList.add("is-visible");
+                                io.unobserve(entry.target);
+                            }
+                        });
+                    },
+                    // Dispara cuando el elemento ha entrado ~12% en el viewport.
+                    { rootMargin: "0px 0px -12% 0px", threshold: 0.15 },
+                );
+                els.forEach(function (el) {
+                    io.observe(el);
+                });
+
+                // Seguridad SOLO para casos sin scroll real (no pre-revela durante uso).
+                window.addEventListener("beforeprint", revealAll);
+                window.addEventListener("pagehide", revealAll);
+                document.addEventListener("visibilitychange", function () {
+                    if (document.visibilityState === "hidden") revealAll();
+                });
+            })();
+        </script>
+    </body>
+</html>

@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/*
+ * Hace que Tailwind escanee los componentes de ESTE paquete cuando el CSS se
+ * importa desde otra app del monorepo (las rutas de @source son relativas a
+ * este archivo). Sin esto, las clases que solo se usan dentro de @repo/ui no
+ * se generarían en el build de la app que lo consume.
+ */
+@source "./**/*.{ts,tsx}";
+
+/*
+ * Sistema de color 60-30-10 (Dirección A): azul de marca + neutros con tinte
+ * navy (no grises planos) + oscuros = tinta navy de marca + set de mini-acentos
+ * (coral, ámbar, teal, verde) para chips, ilustraciones y estados.
+ *
+ * Redefinimos el ramp `slate` de Tailwind con neutros tintados, así TODO lo que
+ * ya usa slate-* adopta la paleta sin tocar componentes. El 60 (base) son
+ * white + slate-50; el 30 (oscuro/texto) son slate-800/900 (ink-navy).
+ */
+@theme {
+  /* 10% — Primario (azul de marca, #1F6FEB en el 600) */
+  --color-brand-50: #eaf1fe;
+  --color-brand-100: #d6e3fd;
+  --color-brand-200: #b0c8fb;
+  --color-brand-300: #84a8f7;
+  --color-brand-400: #4f84f1;
+  --color-brand-500: #2e74ee;
+  --color-brand-600: #1f6feb;
+  --color-brand-700: #1654c4;
+  --color-brand-800: #143f92;
+  --color-brand-900: #14306e;
+
+  /* 60% base + 30% oscuro — neutros con tinte navy (sustituyen al gris plano) */
+  --color-slate-50: #f5f8fc;
+  --color-slate-100: #eaf0f8;
+  --color-slate-200: #d5dfec;
+  --color-slate-300: #b6c4d8;
+  --color-slate-400: #8295b0;
+  --color-slate-500: #5e708c;
+  --color-slate-600: #45566f;
+  --color-slate-700: #2d3d57;
+  --color-slate-800: #16223d;
+  --color-slate-900: #0e1b33;
+  --color-slate-950: #081127;
+
+  /* 10% — Mini-acentos (uso puntual: chips, badges, ilustraciones, estados) */
+  --color-coral-100: #fde4e0;
+  --color-coral-500: #f26a5a;
+  --color-coral-600: #e0503f;
+  --color-coral-700: #c53d2d;
+
+  --color-amber-100: #fff1cc;
+  --color-amber-500: #ffc247;
+  --color-amber-600: #f0a81f;
+  --color-amber-700: #b97908;
+
+  --color-teal-100: #d3f0ec;
+  --color-teal-500: #2bb7a6;
+  --color-teal-600: #1e9c8c;
+  --color-teal-700: #157a6e;
+
+  --color-success-50: #ecf8f1;
+  --color-success-100: #d7f0e3;
+  --color-success-500: #19a974;
+  --color-success-600: #128a5e;
+  --color-success-700: #0e6b49;
+
+  /* Estado de error: rojo con tinte cálido, coherente con la familia coral. */
+  --color-danger-50: #fdecea;
+  --color-danger-100: #fbd5d0;
+  --color-danger-500: #e5484d;
+  --color-danger-600: #d12d33;
+  --color-danger-700: #b01b21;
+
+  --radius-card: 0.75rem;
+
+  /*
+   * Tipografía: stack de SISTEMA afinado (sin fuentes ni CDN externas, ver
+   * README). La voz "técnica nítida" se apoya en escala + peso + tracking, no
+   * en una tipografía de marca. `display` reutiliza el mismo stack pero las
+   * utilidades .u-display le aplican tracking negativo y balance.
+   */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* Curva de salida exponencial (sin rebote) para todo el motion del sistema. */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Capa base COMPARTIDA por la web (Astro/Preact) y el dashboard (React).
+ * Vive aquí para que ambas apps hereden exactamente el mismo foco, selección y
+ * comportamiento de motion sin duplicar reglas.
+ */
+@layer base {
+  /*
+   * Foco visible coherente en TODO elemento interactivo (links, botones,
+   * inputs, selects). Antes solo el <Button> de @repo/ui tenía anillo; los
+   * CTA <a> inline de la web quedaban sin indicación de foco (fallo a11y).
+   */
+  :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-600);
+    color: white;
+  }
+
+  /* Tipográfico de cuerpo: line-height cómodo y sin orphans en prosa larga. */
+  body {
+    text-wrap: pretty;
+  }
+
+  /*
+   * Motion accesible por defecto. El contenido es SIEMPRE visible; el reveal
+   * solo aplica cuando hay JS (clase .reveal-on en <html>) y el usuario no pide
+   * reduce-motion. Así un render sin JS o headless nunca muestra la página en
+   * blanco. (ver utilidades [data-reveal] en cada app.)
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

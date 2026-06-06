@@ -1,0 +1,102 @@
+---
+import { render, type CollectionEntry } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../PageHero.astro";
+import { getPath, useTranslations, type Locale } from "../../i18n/utils";
+import type { TopicKey } from "../../i18n/topics";
+import TopicChips from "../TopicChips.astro";
+import RelatedGrid from "../RelatedGrid.astro";
+import { getRelatedProjects, getRelatedPosts } from "../../lib/related";
+
+interface Props {
+  entry: CollectionEntry<"services">;
+  alternates: { locale: Locale; href: string }[];
+}
+
+const { entry, alternates } = Astro.props;
+const locale = entry.data.locale as Locale;
+const topics = entry.data.topics as TopicKey[];
+const t = useTranslations(locale);
+const { Content } = await render(entry);
+
+// Relacionados por categoría + tags: primero los casos del portafolio, luego
+// los artículos del blog de esa misma familia/temática.
+const relatedProjects = await getRelatedProjects({
+  locale,
+  category: entry.data.category,
+  topics,
+  excludeKey: entry.data.key,
+  limit: 3,
+});
+const relatedPosts = await getRelatedPosts({
+  locale,
+  category: entry.data.category,
+  topics,
+  excludeKey: entry.data.key,
+  limit: 3,
+});
+---
+
+<Layout
+  locale={locale}
+  activeNav="services"
+  title={entry.data.title}
+  description={entry.data.description}
+  image={entry.data.ogImage ?? entry.data.image}
+  alternates={alternates}
+  heroOverlay
+  breadcrumbs={[
+    { label: t("nav.home"), href: getPath(locale, "home") },
+    { label: t("services.title"), href: getPath(locale, "services") },
+    { label: entry.data.title },
+  ]}
+>
+  <PageHero
+    slot="hero"
+    eyebrow={t("services.title")}
+    title={entry.data.title}
+    subtitle={entry.data.description}
+    image={entry.data.image}
+  />
+
+  {/* Lectura a dos columnas: contenido + aside fijo con CTA. */}
+  <div class="grid gap-10 lg:grid-cols-[1fr_320px] lg:gap-16">
+    <article class="min-w-0 max-w-2xl">
+      <div class="prose-bezenti">
+        <Content />
+      </div>
+
+      {topics.length > 0 && (
+        <div class="mt-10 border-t border-slate-200 pt-6">
+          <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+            {t("topics.label")}
+          </p>
+          <TopicChips locale={locale} topics={topics} />
+        </div>
+      )}
+    </article>
+
+    <aside class="lg:sticky lg:top-28 lg:self-start">
+      <div class="rounded-3xl bg-slate-900 p-7 text-white">
+        <h2 class="text-lg font-semibold">
+          {locale === "es" ? "¿Te encaja este servicio?" : "Is this the service you need?"}
+        </h2>
+        <p class="mt-2 text-sm leading-relaxed text-slate-400">
+          {locale === "es"
+            ? "Cuéntanos tu caso y te decimos cómo lo abordaríamos, sin compromiso."
+            : "Tell us about your case and we'll explain how we'd approach it, no strings attached."}
+        </p>
+        <a
+          href={getPath(locale, "contact")}
+          class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-600 px-6 py-3 font-medium text-white transition-colors hover:bg-brand-500"
+        >
+          {t("cta.discuss")}
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    </aside>
+  </div>
+
+  <RelatedGrid title={t("related.projects")} items={relatedProjects} />
+  <RelatedGrid title={t("related.posts")} items={relatedPosts} />
+</Layout>

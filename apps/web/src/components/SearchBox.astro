@@ -1,0 +1,205 @@
+---
+import { useTranslations, type Locale } from "../i18n/utils";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+---
+
+{/* Botón que abre el buscador. Hereda el color del estado del header. */}
+<button
+  type="button"
+  id="search-open"
+  aria-haspopup="dialog"
+  aria-label={t("search.label")}
+  class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/10 group-data-[solid=true]/h:text-slate-700 group-data-[solid=true]/h:hover:bg-slate-100"
+>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true">
+    <circle cx="11" cy="11" r="7"></circle>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  </svg>
+</button>
+
+{/* Diálogo de búsqueda (modal nativo). */}
+<dialog
+  id="search-dialog"
+  aria-label={t("search.label")}
+  class="m-auto w-[min(40rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/50 backdrop:backdrop-blur-sm"
+>
+  <div class="flex items-center gap-3 border-b border-slate-200 px-4">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+    <input
+      id="search-input"
+      type="search"
+      autocomplete="off"
+      enterkeyhint="go"
+      role="combobox"
+      aria-expanded="false"
+      aria-controls="search-results"
+      aria-autocomplete="list"
+      placeholder={t("search.placeholder")}
+      class="w-full border-0 bg-transparent py-4 text-base text-slate-900 outline-none placeholder:text-slate-400"
+    />
+    <button type="button" id="search-close" aria-label={t("search.close")} class="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <p id="search-hint" class="px-5 py-6 text-sm text-slate-500">{t("search.hint")}</p>
+  <ul id="search-results" role="listbox" aria-label={t("search.label")} class="hidden max-h-[min(60vh,28rem)] overflow-y-auto py-2"></ul>
+</dialog>
+
+<script is:inline define:vars={{ locale, emptyLabel: t("search.empty") }}>
+  (function () {
+    var openBtn = document.getElementById("search-open");
+    var dialog = document.getElementById("search-dialog");
+    var input = document.getElementById("search-input");
+    var results = document.getElementById("search-results");
+    var hint = document.getElementById("search-hint");
+    var closeBtn = document.getElementById("search-close");
+    if (!openBtn || !dialog || !input || !results) return;
+
+    var index = null;
+    var items = [];
+    var active = -1;
+
+    function loadIndex() {
+      if (index) return Promise.resolve(index);
+      return fetch("/" + locale + "/search.json")
+        .then(function (r) { return r.json(); })
+        .then(function (data) { index = data; return data; })
+        .catch(function () { index = []; return index; });
+    }
+
+    function open() {
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+      loadIndex();
+      setTimeout(function () { input.focus(); }, 30);
+    }
+
+    function close() {
+      if (dialog.open && typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+      input.value = "";
+      render("");
+    }
+
+    function setActive(i) {
+      active = i;
+      var nodes = results.querySelectorAll("[data-result]");
+      nodes.forEach(function (n, idx) {
+        var on = idx === active;
+        n.setAttribute("aria-selected", on ? "true" : "false");
+        n.classList.toggle("bg-slate-100", on);
+        if (on) n.scrollIntoView({ block: "nearest" });
+      });
+    }
+
+    function render(q) {
+      var query = q.trim().toLowerCase();
+      results.innerHTML = "";
+      active = -1;
+
+      if (!query) {
+        results.classList.add("hidden");
+        hint.classList.remove("hidden");
+        input.setAttribute("aria-expanded", "false");
+        return;
+      }
+      hint.classList.add("hidden");
+
+      items = (index || []).filter(function (d) {
+        return (
+          d.title.toLowerCase().indexOf(query) !== -1 ||
+          d.description.toLowerCase().indexOf(query) !== -1 ||
+          d.type.toLowerCase().indexOf(query) !== -1
+        );
+      }).slice(0, 8);
+
+      if (!items.length) {
+        results.classList.remove("hidden");
+        var li = document.createElement("li");
+        li.className = "px-5 py-6 text-sm text-slate-500";
+        li.textContent = emptyLabel + ' "' + q.trim() + '"';
+        results.appendChild(li);
+        input.setAttribute("aria-expanded", "false");
+        return;
+      }
+
+      results.classList.remove("hidden");
+      input.setAttribute("aria-expanded", "true");
+      items.forEach(function (d, i) {
+        var li = document.createElement("li");
+        var a = document.createElement("a");
+        a.href = d.url;
+        a.setAttribute("role", "option");
+        a.setAttribute("data-result", "");
+        a.setAttribute("aria-selected", "false");
+        a.className = "block px-5 py-3 transition-colors hover:bg-slate-100 focus:bg-slate-100 focus:outline-none";
+        a.addEventListener("mousemove", function () { setActive(i); });
+
+        var type = document.createElement("span");
+        type.className = "text-xs font-medium uppercase tracking-wide text-brand-600";
+        type.textContent = d.type;
+
+        var title = document.createElement("p");
+        title.className = "mt-0.5 font-semibold text-slate-900";
+        title.textContent = d.title;
+
+        var desc = document.createElement("p");
+        desc.className = "mt-0.5 line-clamp-1 text-sm text-slate-500";
+        desc.textContent = d.description;
+
+        a.appendChild(type);
+        a.appendChild(title);
+        a.appendChild(desc);
+        li.appendChild(a);
+        results.appendChild(li);
+      });
+    }
+
+    openBtn.addEventListener("click", open);
+    if (closeBtn) closeBtn.addEventListener("click", close);
+
+    input.addEventListener("input", function (e) { render(e.target.value); });
+
+    input.addEventListener("keydown", function (e) {
+      var nodes = results.querySelectorAll("[data-result]");
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (nodes.length) setActive((active + 1) % nodes.length);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (nodes.length) setActive((active - 1 + nodes.length) % nodes.length);
+      } else if (e.key === "Enter") {
+        var target = nodes[active] || nodes[0];
+        if (target) { e.preventDefault(); window.location.href = target.href; }
+      }
+    });
+
+    // Click en el backdrop (fuera del panel) cierra.
+    dialog.addEventListener("click", function (e) {
+      if (e.target === dialog) close();
+    });
+    // Reset al cerrar con Escape (evento nativo del dialog).
+    dialog.addEventListener("close", function () { input.value = ""; render(""); });
+
+    // Atajo de teclado: ⌘K / Ctrl+K.
+    document.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (dialog.open) close(); else open();
+      }
+    });
+  })();
+</script>

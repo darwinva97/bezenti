@@ -1,0 +1,41 @@
+---
+import { type Locale } from "../i18n/config";
+import { useTranslations } from "../i18n/utils";
+
+interface Props {
+  locale: Locale;
+  /** El mismo recurso en cada idioma (de los hreflang del Layout). */
+  alternates: { locale: Locale; href: string }[];
+}
+
+const { locale, alternates } = Astro.props;
+const t = useTranslations(locale);
+---
+
+{/*
+  Selector de idioma como <select> nativo: al cambiar, navega a la URL del
+  mismo recurso en el idioma elegido. Los colores se adaptan al estado del
+  header (transparente sobre el hero / sólido al hacer scroll) vía group-data.
+*/}
+<select
+  data-lang-select
+  aria-label={t("lang.label")}
+  class="cursor-pointer rounded-md border-0 bg-transparent px-1 py-1.5 text-sm font-medium uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-white group-data-[solid=true]/h:text-slate-700"
+>
+  {
+    alternates.map(({ locale: l, href }) => (
+      <option value={href} selected={l === locale} class="text-slate-800">
+        {l}
+      </option>
+    ))
+  }
+</select>
+
+<script is:inline>
+  document.querySelectorAll("[data-lang-select]").forEach((el) => {
+    el.addEventListener("change", (e) => {
+      const url = e.target.value;
+      if (url) window.location.href = url;
+    });
+  });
+</script>

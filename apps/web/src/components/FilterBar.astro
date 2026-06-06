@@ -1,0 +1,75 @@
+---
+/**
+ * Barra de filtros por categoría (mejora progresiva). Renderiza una píldora
+ * "Todo" más una por cada filtro; al pulsar, muestra solo los elementos
+ * `[data-filter-item]` cuyo `data-category` (o `data-topics`) coincide, dentro
+ * del contenedor `#{scope}`. Sin JS, todo queda visible y los filtros no estorban.
+ *
+ * Uso: envolver la barra y la rejilla en un `<div id={scope}>`; cada tarjeta
+ * lleva `data-filter-item data-category="…" data-topics="a b c"`.
+ */
+interface Props {
+  /** Id del contenedor que agrupa esta barra y su rejilla. */
+  scope: string;
+  /** Etiqueta de la píldora que muestra todo. */
+  allLabel: string;
+  /** Filtros disponibles (normalmente categorías presentes). */
+  filters: { value: string; label: string }[];
+}
+
+const { scope, allLabel, filters } = Astro.props;
+const chips = [{ value: "", label: allLabel }, ...filters];
+---
+
+<div role="group" class="flex flex-wrap gap-2">
+  {
+    chips.map((c) => (
+      <button
+        type="button"
+        data-filter-value={c.value}
+        aria-pressed={c.value === "" ? "true" : "false"}
+        class="rounded-full border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900 aria-[pressed=true]:border-brand-600 aria-[pressed=true]:bg-brand-600 aria-[pressed=true]:text-white"
+      >
+        {c.label}
+      </button>
+    ))
+  }
+</div>
+
+<script is:inline define:vars={{ scope }}>
+  (function () {
+    var root = document.getElementById(scope);
+    if (!root) return;
+    var chips = root.querySelectorAll("[data-filter-value]");
+    if (!chips.length) return;
+
+    function apply(value) {
+      // Se consultan al usar: este script va embebido ANTES de la rejilla, así
+      // que en tiempo de parseo los items aún no existen.
+      var items = root.querySelectorAll("[data-filter-item]");
+      items.forEach(function (el) {
+        var show =
+          value === "" ||
+          el.getAttribute("data-category") === value ||
+          (" " + (el.getAttribute("data-topics") || "") + " ").indexOf(
+            " " + value + " ",
+          ) >= 0;
+        // `style.display` (inline) gana sobre la clase de display de Tailwind;
+        // el atributo `hidden` no bastaría (flex/block lo anularían).
+        el.style.display = show ? "" : "none";
+      });
+      chips.forEach(function (c) {
+        c.setAttribute(
+          "aria-pressed",
+          c.getAttribute("data-filter-value") === value ? "true" : "false",
+        );
+      });
+    }
+
+    chips.forEach(function (c) {
+      c.addEventListener("click", function () {
+        apply(c.getAttribute("data-filter-value") || "");
+      });
+    });
+  })();
+</script>

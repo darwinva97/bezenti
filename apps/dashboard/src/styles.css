@@ -1,0 +1,9 @@
+/*
+ * Misma base que la app Astro: Tailwind + tokens compartidos de @repo/ui.
+ * (@repo/ui/styles.css ya hace `@import "tailwindcss"`.)
+ */
+@import "@repo/ui/styles.css";
+
+:root {
+  color-scheme: light;
+}

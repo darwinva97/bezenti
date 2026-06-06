@@ -1,0 +1,209 @@
+---
+import { getCollection, type CollectionEntry } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../PageHero.astro";
+import ServiceRow from "../ServiceRow.astro";
+import { getAlternateLinks, getPath, useTranslations, type Locale } from "../../i18n/utils";
+import { serviceHref } from "../../lib/urls";
+import {
+  categoriesByScope,
+  childrenOf,
+  categoryName,
+  type CategoryKey,
+} from "../../i18n/categories";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+
+type Service = CollectionEntry<"services">;
+
+const services = (await getCollection("services"))
+  .filter((s) => s.data.locale === locale && !s.data.draft)
+  .sort((a, b) => a.data.order - b.data.order);
+
+const inCat = (key: string): Service[] => services.filter((s) => s.data.category === key);
+
+// Grupos = categorías globales de PRIMER nivel (sin padre). Cada grupo puede
+// tener servicios directos y/o subgrupos (categorías hijas con servicios).
+const topLevel = categoriesByScope("global").filter((c) => !c.parent);
+
+const groups = topLevel
+  .map((cat) => {
+    const direct = inCat(cat.key);
+    const subgroups = childrenOf(cat.key as CategoryKey)
+      .map((child) => ({ cat: child, items: inCat(child.key) }))
+      .filter((sg) => sg.items.length > 0);
+    const total = direct.length + subgroups.reduce((n, sg) => n + sg.items.length, 0);
+    return { cat, direct, subgroups, total };
+  })
+  .filter((g) => g.total > 0);
+
+const totalServices = groups.reduce((n, g) => n + g.total, 0);
+
+const viewLabel = locale === "es" ? "Ver servicio" : "View service";
+const countLabel = (n: number) =>
+  locale === "es"
+    ? `${n} ${n === 1 ? "servicio" : "servicios"}`
+    : `${n} ${n === 1 ? "service" : "services"}`;
+const railTitle = locale === "es" ? "Catálogo" : "Catalog";
+
+// Acento por categoría padre (clases LITERALES para Tailwind). `dot` siempre
+// visible; `text` colorea el título del servicio al hover.
+const ACCENT: Record<string, { dot: string; text: string }> = {
+  web: { dot: "bg-brand-500", text: "group-hover:text-brand-600" },
+  ecommerce: { dot: "bg-coral-500", text: "group-hover:text-coral-600" },
+  marketing: { dot: "bg-amber-500", text: "group-hover:text-amber-700" },
+  automation: { dot: "bg-teal-500", text: "group-hover:text-teal-600" },
+  systems: { dot: "bg-success-500", text: "group-hover:text-success-600" },
+  servers: { dot: "bg-brand-500", text: "group-hover:text-brand-600" },
+};
+const accentOf = (key: string) => ACCENT[key] ?? ACCENT.web;
+
+const teaserOf = (s: Service) => s.data.teaser ?? s.data.description;
+---
+
+<Layout
+  locale={locale}
+  activeNav="services"
+  title={t("services.title")}
+  description={t("services.subtitle")}
+  alternates={getAlternateLinks("services")}
+  heroOverlay
+  breadcrumbs={[
+    { label: t("nav.home"), href: getPath(locale, "home") },
+    { label: t("services.title") },
+  ]}
+>
+  <PageHero
+    slot="hero"
+    title={t("services.title")}
+    subtitle={t("services.subtitle")}
+    image="/images/banners/services.jpg"
+  />
+
+  <div class="lg:grid lg:grid-cols-[15rem_1fr] lg:gap-14 xl:gap-20">
+    {/* Rail de catálogo: navegación fija con la categoría activa resaltada
+        (scroll-spy). Degrada a simples anclas sin JS. */}
+    <aside class="hidden lg:block">
+      <div class="sticky top-28">
+        <div class="flex items-baseline justify-between">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">{railTitle}</p>
+          <span class="text-xs tabular-nums text-slate-400">{totalServices}</span>
+        </div>
+        <nav class="mt-4 -mx-3 flex flex-col">
+          {
+            groups.map((g) => (
+              <a
+                href={`#${g.cat.key}`}
+                data-rail={g.cat.key}
+                class="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-slate-100 aria-[current=true]:bg-slate-100"
+              >
+                <span class="flex items-center gap-2.5">
+                  <span class:list={["h-2 w-2 rounded-full", accentOf(g.cat.key).dot]} />
+                  <span class="text-sm font-medium text-slate-600 transition-colors group-hover:text-slate-900 group-aria-[current=true]:text-slate-900">
+                    {categoryName(locale, g.cat.key as CategoryKey)}
+                  </span>
+                </span>
+                <span class="text-xs tabular-nums text-slate-400">{g.total}</span>
+              </a>
+            ))
+          }
+        </nav>
+      </div>
+    </aside>
+
+    {/* Secciones por categoría. */}
+    <div>
+      {
+        groups.map((g, gi) => (
+          <section id={g.cat.key} class:list={["scroll-mt-28", gi > 0 && "mt-14 sm:mt-20"]}>
+            <div data-reveal class="flex items-baseline justify-between gap-4 border-b border-slate-200 pb-4">
+              <div class="flex items-center gap-3">
+                <span class:list={["h-3 w-3 rounded-full", accentOf(g.cat.key).dot]} />
+                <h2 class="u-display text-2xl font-bold text-slate-900 sm:text-3xl">
+                  {categoryName(locale, g.cat.key as CategoryKey)}
+                </h2>
+              </div>
+              <span class="shrink-0 text-sm tabular-nums text-slate-400">{countLabel(g.total)}</span>
+            </div>
+
+            {/* Servicios directos del grupo (sin subcategoría). */}
+            {g.direct.length > 0 && (
+              <ul class="mt-2">
+                {g.direct.map((s, i) => (
+                  <ServiceRow
+                    href={serviceHref(locale, s.data.slug)}
+                    title={s.data.title}
+                    teaser={teaserOf(s)}
+                    image={s.data.cardImage ?? s.data.image}
+                    viewLabel={viewLabel}
+                    accentText={accentOf(g.cat.key).text}
+                    index={i}
+                  />
+                ))}
+              </ul>
+            )}
+
+            {/* Subgrupos: categorías hijas (p. ej. Servidores → Hosting, Dominios…). */}
+            {g.subgroups.map((sg) => (
+              <div class="mt-8">
+                <h3 class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  <span class="h-px w-5 bg-slate-300" />
+                  {categoryName(locale, sg.cat.key as CategoryKey)}
+                </h3>
+                <ul class="mt-2">
+                  {sg.items.map((s, i) => (
+                    <ServiceRow
+                      href={serviceHref(locale, s.data.slug)}
+                      title={s.data.title}
+                      teaser={teaserOf(s)}
+                      image={s.data.cardImage ?? s.data.image}
+                      viewLabel={viewLabel}
+                      accentText={accentOf(g.cat.key).text}
+                      index={i}
+                    />
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        ))
+      }
+    </div>
+  </div>
+
+  {/* Scroll-spy del rail de catálogo: resalta la categoría visible. Mejora
+      progresiva; sin JS, las anclas siguen funcionando. */}
+  <script is:inline>
+    (function () {
+      var links = document.querySelectorAll("[data-rail]");
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (l) {
+        map[l.getAttribute("data-rail")] = l;
+      });
+      function setActive(id) {
+        links.forEach(function (l) {
+          l.removeAttribute("aria-current");
+        });
+        if (map[id]) map[id].setAttribute("aria-current", "true");
+      }
+      var io = new IntersectionObserver(
+        function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) setActive(e.target.id);
+          });
+        },
+        { rootMargin: "-25% 0px -65% 0px", threshold: 0 },
+      );
+      Object.keys(map).forEach(function (id) {
+        var s = document.getElementById(id);
+        if (s) io.observe(s);
+      });
+    })();
+  </script>
+</Layout>

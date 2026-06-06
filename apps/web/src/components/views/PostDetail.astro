@@ -1,0 +1,83 @@
+---
+import { render, type CollectionEntry } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../PageHero.astro";
+import { getPath, useTranslations, type Locale } from "../../i18n/utils";
+import type { TopicKey } from "../../i18n/topics";
+import TopicChips from "../TopicChips.astro";
+import RelatedContent from "../RelatedContent.astro";
+
+interface Props {
+  entry: CollectionEntry<"posts">;
+  alternates: { locale: Locale; href: string }[];
+}
+
+const { entry, alternates } = Astro.props;
+const locale = entry.data.locale as Locale;
+const topics = entry.data.topics as TopicKey[];
+const t = useTranslations(locale);
+const { Content } = await render(entry);
+const fmt = new Intl.DateTimeFormat(locale, { dateStyle: "long" });
+---
+
+<Layout
+  locale={locale}
+  activeNav="blog"
+  title={entry.data.title}
+  description={entry.data.description}
+  ogType="article"
+  image={entry.data.ogImage ?? entry.data.image}
+  alternates={alternates}
+  heroOverlay
+  breadcrumbs={[
+    { label: t("nav.home"), href: getPath(locale, "home") },
+    { label: t("blog.title"), href: getPath(locale, "blog") },
+    { label: entry.data.title },
+  ]}
+>
+  <PageHero
+    slot="hero"
+    eyebrow={t("blog.title")}
+    title={entry.data.title}
+    subtitle={entry.data.description}
+    image={entry.data.image}
+  >
+    <p class="mt-4 text-sm text-slate-300">
+      {t("blog.published")}{" "}
+      <time datetime={entry.data.pubDate.toISOString()}>{fmt.format(entry.data.pubDate)}</time>
+    </p>
+  </PageHero>
+
+  <article class="max-w-2xl">
+    <div class="prose-bezenti">
+      <Content />
+    </div>
+    {topics.length > 0 && (
+      <div class="mt-10 border-t border-slate-200 pt-6">
+        <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+          {t("topics.label")}
+        </p>
+        <TopicChips locale={locale} topics={topics} />
+      </div>
+    )}
+
+    {/* CTA de cierre del artículo. */}
+    <div data-reveal class="mt-10 flex flex-col gap-4 rounded-3xl bg-slate-900 p-7 text-white sm:flex-row sm:items-center sm:justify-between sm:p-8">
+      <div>
+        <h2 class="text-lg font-semibold">
+          {locale === "es" ? "¿Te ayudamos con tu proyecto?" : "Want help with your project?"}
+        </h2>
+        <p class="mt-1 text-sm text-slate-400">{t("home.final.subtitle")}</p>
+      </div>
+      <a
+        href={getPath(locale, "contact")}
+        class="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-brand-600 px-6 py-3 font-medium text-white transition-colors hover:bg-brand-500"
+      >
+        {t("cta.discuss")}
+        <span aria-hidden="true">→</span>
+      </a>
+    </div>
+  </article>
+
+  <RelatedContent locale={locale} topics={topics} exclude={{ type: "post", id: entry.id }} />
+</Layout>

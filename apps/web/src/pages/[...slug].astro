@@ -1,0 +1,157 @@
+---
+import type { GetStaticPaths } from "astro";
+import { getCollection, type CollectionEntry } from "astro:content";
+import { locales, type Locale } from "../i18n/config";
+import { projectCategories, type ProjectCategoryKey } from "../i18n/categories";
+import {
+  serviceHref,
+  categoryHref,
+  projectHref,
+  postHref,
+  topicHref,
+  alternatesByKey,
+} from "../lib/urls";
+import { topics as allTopics, type TopicKey } from "../i18n/topics";
+import ServiceDetail from "../components/views/ServiceDetail.astro";
+import CategoryHub from "../components/views/CategoryHub.astro";
+import ProjectDetail from "../components/views/ProjectDetail.astro";
+import PostDetail from "../components/views/PostDetail.astro";
+import TopicArchive from "../components/views/TopicArchive.astro";
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const services = await getCollection("services");
+  const projects = await getCollection("projects");
+  const posts = await getCollection("posts");
+
+  const live = <T extends { data: { draft: boolean } }>(arr: T[]) =>
+    arr.filter((e) => !e.data.draft);
+
+  const paths: {
+    params: { slug: string };
+    props: Record<string, unknown>;
+  }[] = [];
+
+  // Servicios (PLANOS): /{locale}/{slug}
+  for (const entry of live(services)) {
+    const href = serviceHref(entry.data.locale as Locale, entry.data.slug);
+    paths.push({
+      params: { slug: href.slice(1) },
+      props: {
+        kind: "service",
+        entry,
+        alternates: alternatesByKey(services, entry.data.key, (e) =>
+          serviceHref(e.data.locale as Locale, e.data.slug),
+        ),
+      },
+    });
+  }
+
+  // Hubs de categoría: /{locale}/{proyectos|projects}/{cat} (solo con proyectos)
+  for (const locale of locales) {
+    for (const c of projectCategories) {
+      const has = live(projects).some(
+        (p) => p.data.locale === locale && p.data.category === c.key,
+      );
+      if (!has) continue;
+      const href = categoryHref(locale, c.key as ProjectCategoryKey);
+      paths.push({
+        params: { slug: href.slice(1) },
+        props: {
+          kind: "category",
+          locale,
+          category: c.key,
+          alternates: locales.map((l) => ({
+            locale: l,
+            href: categoryHref(l, c.key as ProjectCategoryKey),
+          })),
+        },
+      });
+    }
+  }
+
+  // Proyectos (ANIDADOS): /{locale}/{proyectos|projects}/{cat}/{slug}
+  for (const entry of live(projects)) {
+    const href = projectHref(
+      entry.data.locale as Locale,
+      entry.data.category as ProjectCategoryKey,
+      entry.data.slug,
+    );
+    paths.push({
+      params: { slug: href.slice(1) },
+      props: {
+        kind: "project",
+        entry,
+        alternates: alternatesByKey(projects, entry.data.key, (e) =>
+          projectHref(
+            e.data.locale as Locale,
+            e.data.category as ProjectCategoryKey,
+            e.data.slug,
+          ),
+        ),
+      },
+    });
+  }
+
+  // Posts (PLANOS bajo /blog): /{locale}/blog/{slug}
+  for (const entry of live(posts)) {
+    const href = postHref(entry.data.locale as Locale, entry.data.slug);
+    paths.push({
+      params: { slug: href.slice(1) },
+      props: {
+        kind: "post",
+        entry,
+        alternates: alternatesByKey(posts, entry.data.key, (e) =>
+          postHref(e.data.locale as Locale, e.data.slug),
+        ),
+      },
+    });
+  }
+
+  // Archivos de topic: /{locale}/{temas|topics}/{topic} (solo topics usados)
+  const usedTopics = new Set<string>();
+  for (const e of [...live(services), ...live(projects), ...live(posts)])
+    for (const tk of e.data.topics) usedTopics.add(tk);
+
+  for (const locale of locales) {
+    for (const tp of allTopics) {
+      if (!usedTopics.has(tp.key)) continue;
+      const href = topicHref(locale, tp.key as TopicKey);
+      paths.push({
+        params: { slug: href.slice(1) },
+        props: {
+          kind: "topic",
+          locale,
+          topic: tp.key,
+          alternates: locales.map((l) => ({
+            locale: l,
+            href: topicHref(l, tp.key as TopicKey),
+          })),
+        },
+      });
+    }
+  }
+
+  return paths;
+};
+
+const props = Astro.props as
+  | { kind: "service"; entry: CollectionEntry<"services">; alternates: { locale: Locale; href: string }[] }
+  | { kind: "category"; locale: Locale; category: ProjectCategoryKey; alternates: { locale: Locale; href: string }[] }
+  | { kind: "project"; entry: CollectionEntry<"projects">; alternates: { locale: Locale; href: string }[] }
+  | { kind: "post"; entry: CollectionEntry<"posts">; alternates: { locale: Locale; href: string }[] }
+  | { kind: "topic"; locale: Locale; topic: TopicKey; alternates: { locale: Locale; href: string }[] };
+---
+
+{props.kind === "service" && <ServiceDetail entry={props.entry} alternates={props.alternates} />}
+{
+  props.kind === "category" && (
+    <CategoryHub locale={props.locale} category={props.category} alternates={props.alternates} />
+  )
+}
+{props.kind === "project" && <ProjectDetail entry={props.entry} alternates={props.alternates} />}
+{props.kind === "post" && <PostDetail entry={props.entry} alternates={props.alternates} />}
+{
+  props.kind === "topic" && (
+    <TopicArchive locale={props.locale} topic={props.topic} alternates={props.alternates} />
+  )
+}

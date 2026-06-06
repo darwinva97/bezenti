@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bezenti-dashboard",
+  "compatibility_date": "2026-01-01",
+  // SPA/CSR puro: NO hay Worker (sin `main`). Cloudflare sirve los assets
+  // estáticos de ./dist/client desde la CDN y, para cualquier ruta que no sea
+  // un asset (p. ej. /products), devuelve el shell (index.html) con 200 para
+  // que el router de TanStack resuelva la ruta en el cliente.
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application"
+  }
+}

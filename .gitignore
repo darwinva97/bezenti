@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+.output/
+.vinxi/
+.tanstack/
+.nitro/
+
+# turborepo
+.turbo/
+
+# generated types (astro)
+.astro/
+
+# wrangler / cloudflare
+.wrangler/
+
+# logs
+npm-debug.log*
+pnpm-debug.log*
+
+# environment
+.env
+.env.*
+!.env.example
+
+# editor / os
+.DS_Store
+.vscode/
+
+# local agent tooling / skills
+.claude/
+*.log
+.gemini/

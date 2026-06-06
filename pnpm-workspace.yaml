@@ -1,0 +1,24 @@
+# Configuración de pnpm para este proyecto (monorepo).
+#
+# Workspaces: cada app vive en apps/* y cada librería compartida en packages/*.
+packages:
+  - "apps/*"
+  - "packages/*"
+
+#
+# minimumReleaseAge: solo se instalan versiones publicadas hace al menos
+# este nº de MINUTOS. 2 días = 2880 minutos. Así, al resolver "latest"
+# (o cualquier rango), pnpm ignora versiones recién publicadas (mitiga
+# ataques de cadena de suministro con paquetes maliciosos recién subidos).
+minimumReleaseAge: 2880
+
+# Si en el futuro necesitas exceptuar algún paquete de esa espera:
+# minimumReleaseAgeExclude:
+#   - nombre-del-paquete
+
+# Paquetes a los que SÍ permitimos ejecutar scripts de postinstall.
+# pnpm los bloquea por defecto por seguridad; Astro necesita estos.
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - workerd

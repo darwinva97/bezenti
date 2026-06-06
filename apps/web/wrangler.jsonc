@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bezenti",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-01-01",
+  // Dominio personalizado. `custom_domain` hace que wrangler cree el registro
+  // DNS y el certificado. Requiere que la zona bezenti.com ya exista en tu
+  // cuenta de Cloudflare.
+  "routes": [
+    { "pattern": "bezenti.com", "custom_domain": true },
+    { "pattern": "www.bezenti.com", "custom_domain": true }
+  ],
+  // Static Assets: sirve el build de Astro. `run_worker_first` fuerza que el
+  // Worker decida el idioma en la raíz y atienda la API de contacto; el resto
+  // se sirve directo desde la CDN.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/", "/api/*"],
+    // Servir sin barra final (/en, no /en/) para que coincida con los canonical
+    // y los enlaces internos, evitando un redirect 307 en cada navegación.
+    "html_handling": "drop-trailing-slash"
+  },
+  // Base de datos de suscriptores de la newsletter (y, más adelante, mensajes
+  // de contacto). El endpoint /api/subscribe da de alta aquí.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bezenti",
+      "database_id": "91cc0789-0647-45b5-a4b0-2079802a4c80"
+    }
+  ]
+}

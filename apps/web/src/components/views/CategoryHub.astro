@@ -1,0 +1,62 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import MediaCard from "../MediaCard.astro";
+import PageHero from "../PageHero.astro";
+import { getPath, useTranslations, type Locale } from "../../i18n/utils";
+import { projectHref } from "../../lib/urls";
+import { categoryName, type ProjectCategoryKey } from "../../i18n/categories";
+
+interface Props {
+  locale: Locale;
+  category: ProjectCategoryKey;
+  alternates: { locale: Locale; href: string }[];
+}
+
+const { locale, category, alternates } = Astro.props;
+const t = useTranslations(locale);
+const name = categoryName(locale, category);
+
+const projects = (await getCollection("projects")).filter(
+  (p) => p.data.locale === locale && p.data.category === category && !p.data.draft,
+);
+---
+
+<Layout
+  locale={locale}
+  activeNav="portfolio"
+  title={`${name} · ${t("portfolio.title")}`}
+  description={`${t("portfolio.category")}: ${name}`}
+  alternates={alternates}
+  heroOverlay
+  breadcrumbs={[
+    { label: t("nav.home"), href: getPath(locale, "home") },
+    { label: t("portfolio.title"), href: getPath(locale, "portfolio") },
+    { label: name },
+  ]}
+>
+  <PageHero
+    slot="hero"
+    eyebrow={t("portfolio.title")}
+    title={name}
+    image="/images/banners/portfolio.jpg"
+  />
+
+  <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {
+      projects.map((p, i) => (
+        <MediaCard
+          href={projectHref(locale, category, p.data.slug)}
+          title={p.data.title}
+          description={p.data.description}
+          image={i === 0 ? p.data.image : (p.data.cardImage ?? p.data.image)}
+          imageAlt={p.data.imageAlt}
+          aspect={i === 0 ? "aspect-[16/9]" : "aspect-square"}
+          class={i === 0 ? "sm:col-span-2" : ""}
+          reveal
+          revealDelay={(i % 3) * 80}
+        />
+      ))
+    }
+  </div>
+</Layout>

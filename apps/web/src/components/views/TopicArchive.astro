@@ -1,0 +1,91 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../PageHero.astro";
+import { getPath, useTranslations, type Locale } from "../../i18n/utils";
+import { topicName, type TopicKey } from "../../i18n/topics";
+import { serviceHref, projectHref, postHref } from "../../lib/urls";
+import type { ProjectCategoryKey } from "../../i18n/categories";
+
+interface Props {
+  locale: Locale;
+  topic: TopicKey;
+  alternates: { locale: Locale; href: string }[];
+}
+
+const { locale, topic, alternates } = Astro.props;
+const t = useTranslations(locale);
+const name = topicName(locale, topic);
+
+const [services, projects, posts] = await Promise.all([
+  getCollection("services"),
+  getCollection("projects"),
+  getCollection("posts"),
+]);
+
+type Item = { type: string; accent: string; title: string; description: string; href: string };
+const items: Item[] = [];
+for (const s of services)
+  if (s.data.locale === locale && !s.data.draft && s.data.topics.includes(topic))
+    items.push({ type: t("type.service"), accent: "bg-brand-100 text-brand-700", title: s.data.title, description: s.data.description, href: serviceHref(locale, s.data.slug) });
+for (const p of projects)
+  if (p.data.locale === locale && !p.data.draft && p.data.topics.includes(topic))
+    items.push({ type: t("type.project"), accent: "bg-coral-100 text-coral-700", title: p.data.title, description: p.data.description, href: projectHref(locale, p.data.category as ProjectCategoryKey, p.data.slug) });
+for (const a of posts)
+  if (a.data.locale === locale && !a.data.draft && a.data.topics.includes(topic))
+    items.push({ type: t("type.post"), accent: "bg-teal-100 text-teal-700", title: a.data.title, description: a.data.description, href: postHref(locale, a.data.slug) });
+---
+
+<Layout
+  locale={locale}
+  title={`${name} · ${t("topics.archiveTitle")}`}
+  description={`${t("topics.label")}: ${name}`}
+  alternates={alternates}
+  heroOverlay
+  breadcrumbs={[
+    { label: t("nav.home"), href: getPath(locale, "home") },
+    { label: `${t("topics.archiveTitle")}: ${name}` },
+  ]}
+>
+  <PageHero
+    slot="hero"
+    eyebrow={t("topics.label")}
+    title={`#${name}`}
+    image="/images/banners/topics.jpg"
+  />
+
+  {items.length === 0 ? (
+    <div class="rounded-3xl border border-dashed border-slate-300 px-6 py-16 text-center">
+      <p class="text-slate-500">{t("topics.empty")}</p>
+      <a
+        href={getPath(locale, "services")}
+        class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700"
+      >
+        {t("nav.services")}
+        <span aria-hidden="true">→</span>
+      </a>
+    </div>
+  ) : (
+    <ul class="border-t border-slate-200">
+      {items.map((i, idx) => (
+        <li data-reveal style={`--reveal-delay:${(idx % 6) * 50}ms`} class="border-b border-slate-200">
+          <a
+            href={i.href}
+            class="group grid grid-cols-[1fr_auto] items-center gap-x-5 py-6 transition-colors hover:bg-slate-50 sm:py-7"
+          >
+            <div class="min-w-0">
+              <span class:list={["inline-block rounded-full px-2.5 py-0.5 text-xs font-medium", i.accent]}>
+                {i.type}
+              </span>
+              <h2 class="mt-2 text-lg font-semibold text-slate-900 transition-colors group-hover:text-brand-600 sm:text-xl">
+                {i.title}
+              </h2>
+              <p class="mt-1 line-clamp-2 text-sm text-slate-500">{i.description}</p>
+            </div>
+            <span class="text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-brand-600" aria-hidden="true">→</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )}
+</Layout>

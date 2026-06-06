@@ -1,0 +1,118 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../PageHero.astro";
+import FilterBar from "../FilterBar.astro";
+import { getAlternateLinks, getPath, useTranslations, type Locale } from "../../i18n/utils";
+import { projectHref } from "../../lib/urls";
+import { projectCategories, categoryName, type ProjectCategoryKey } from "../../i18n/categories";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+
+// Trabajo seleccionado: destacados primero, luego el resto. Galería editorial
+// donde la imagen manda, filtrable por categoría (escala a muchos proyectos).
+const projects = (await getCollection("projects"))
+  .filter((p) => p.data.locale === locale && !p.data.draft)
+  .sort((a, b) => Number(b.data.featured) - Number(a.data.featured));
+
+// Filtros = categorías que tienen al menos un proyecto, en orden de taxonomía.
+const filters = projectCategories
+  .filter((c) => projects.some((p) => p.data.category === c.key))
+  .map((c) => ({ value: c.key, label: categoryName(locale, c.key as ProjectCategoryKey) }));
+
+// Acento (variante clara) de la categoría para el rótulo sobre la imagen oscura.
+const CAT_EYEBROW: Record<string, string> = {
+  web: "text-brand-300",
+  ecommerce: "text-coral-500",
+  marketing: "text-amber-500",
+  automation: "text-teal-500",
+  systems: "text-success-500",
+  servers: "text-brand-300",
+};
+
+const viewLabel = locale === "es" ? "Ver proyecto" : "View project";
+const lead =
+  locale === "es"
+    ? "Casos reales, de la estrategia al lanzamiento. Cada proyecto, un problema de negocio resuelto."
+    : "Real cases, from strategy to launch. Each project, a business problem solved.";
+---
+
+<Layout
+  locale={locale}
+  activeNav="portfolio"
+  title={t("portfolio.title")}
+  description={t("portfolio.subtitle")}
+  alternates={getAlternateLinks("portfolio")}
+  heroOverlay
+  breadcrumbs={[
+    { label: t("nav.home"), href: getPath(locale, "home") },
+    { label: t("portfolio.title") },
+  ]}
+>
+  <PageHero
+    slot="hero"
+    title={t("portfolio.title")}
+    subtitle={t("portfolio.subtitle")}
+    image="/images/banners/portfolio.jpg"
+  />
+
+  <p data-reveal class="max-w-2xl text-lg leading-relaxed text-slate-600">{lead}</p>
+
+  <div id="portfolio">
+    {filters.length > 1 && (
+      <div data-reveal class="mt-8">
+        <FilterBar scope="portfolio" allLabel={t("filter.all")} filters={filters} />
+      </div>
+    )}
+
+    {/* Galería editorial: teselas con imagen a sangre y texto superpuesto. */}
+    <div class="mt-8 grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+      {
+        projects.map((p, i) => {
+          const cat = p.data.category as ProjectCategoryKey;
+          return (
+            <a
+              href={projectHref(locale, cat, p.data.slug)}
+              data-filter-item
+              data-category={cat}
+              data-topics={p.data.topics.join(" ")}
+              data-reveal
+              style={`--reveal-delay:${(i % 3) * 80}ms`}
+              class="group relative isolate flex min-h-[22rem] items-end overflow-hidden rounded-3xl bg-slate-900 text-white"
+            >
+              {p.data.image && (
+                <img
+                  src={p.data.image}
+                  alt={p.data.imageAlt ?? ""}
+                  loading={i < 3 ? "eager" : "lazy"}
+                  decoding="async"
+                  class="absolute inset-0 -z-10 h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.04]"
+                />
+              )}
+              <div
+                class="absolute inset-0 -z-10 bg-gradient-to-t from-slate-950 via-slate-950/45 to-transparent transition-colors duration-300 group-hover:from-slate-950 group-hover:via-slate-950/60"
+                aria-hidden="true"
+              />
+              <div class="w-full p-6 sm:p-7">
+                <span class:list={["text-xs font-semibold uppercase tracking-wider", CAT_EYEBROW[cat] ?? "text-brand-300"]}>
+                  {categoryName(locale, cat)}
+                </span>
+                <h2 class="u-display mt-2 text-2xl font-bold leading-tight">{p.data.title}</h2>
+                <p class="mt-2 max-w-md text-pretty text-sm text-slate-200">{p.data.description}</p>
+                <span class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-white">
+                  {viewLabel}
+                  <span class="transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true">→</span>
+                </span>
+              </div>
+            </a>
+          );
+        })
+      }
+    </div>
+  </div>
+</Layout>

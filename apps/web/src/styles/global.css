@@ -1,0 +1,173 @@
+/*
+ * Importa Tailwind + el tema y los @source compartidos desde @repo/ui.
+ * (@repo/ui/styles.css ya hace `@import "tailwindcss"`, por eso aquí no se
+ * repite.) Así esta app y la de TanStack comparten exactamente los mismos
+ * tokens de diseño (colores brand, radios, foco, motion).
+ */
+@import "@repo/ui/styles.css";
+
+/*
+ * Tipografía de marca para TITULARES: "Bezenti" (basada en Comfortaa, rounded
+ * geométrica), auto-alojada — sin CDN externas, cumple el README. Un único
+ * peso (Regular); declaramos el rango 400–700 para que `font-bold` use la cara
+ * real en vez de sintetizar una negrita deformada. El cuerpo sigue en el stack
+ * de sistema; solo los headlines (.u-display / .u-hero-title) usan la marca.
+ */
+@font-face {
+  font-family: "Bezenti";
+  src:
+    url("/fonts/Bezenti-Regular.woff2") format("woff2"),
+    url("/fonts/Bezenti-Regular.woff") format("woff");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  /* Stack de titulares: marca + fallback al sans del sistema. */
+  --font-display: "Bezenti", var(--font-sans);
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Evita el scroll horizontal de 1px por las secciones a sangre (100vw) sin
+   * crear un contenedor de scroll (clip, a diferencia de hidden, no rompe los
+   * position: sticky de las vistas). */
+  overflow-x: clip;
+}
+
+@layer base {
+  /*
+   * Display: titulares con tracking negativo y reparto de líneas equilibrado.
+   * La utilidad se aplica a h1–h3 de heros y secciones; el tamaño lo siguen
+   * poniendo las clases Tailwind (text-4xl…) para no acoplar escala y voz.
+   */
+  .u-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  /* Titular de hero fluido: escala suave entre móvil y desktop sin saltos. */
+  .u-hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(2.25rem, 1.4rem + 3.6vw, 3.75rem);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  /*
+   * Prosa del contenido markdown (fichas de servicio/proyecto/post). Sustituye
+   * los selectores [&_…] repetidos en cada vista de detalle por un único
+   * sistema tipográfico coherente. El markdown es simple (párrafos + listas);
+   * encabezados/enlaces/negritas se estilan por si el contenido crece.
+   */
+  .prose-bezenti {
+    color: var(--color-slate-700);
+    line-height: 1.7;
+  }
+  .prose-bezenti > * + * {
+    margin-top: 1rem;
+  }
+  .prose-bezenti h2 {
+    margin-top: 2rem;
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-slate-900);
+    text-wrap: balance;
+  }
+  .prose-bezenti h3 {
+    margin-top: 1.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--color-slate-900);
+  }
+  .prose-bezenti ul {
+    margin-left: 0;
+    list-style: none;
+  }
+  .prose-bezenti ul li {
+    position: relative;
+    padding-left: 1.5rem;
+  }
+  .prose-bezenti ul li + li {
+    margin-top: 0.5rem;
+  }
+  /* Marcador de lista: punto de marca, no el bullet plano por defecto. */
+  .prose-bezenti ul li::before {
+    content: "";
+    position: absolute;
+    left: 0.25rem;
+    top: 0.625rem;
+    height: 0.375rem;
+    width: 0.375rem;
+    border-radius: 9999px;
+    background-color: var(--color-brand-500);
+  }
+  .prose-bezenti ol {
+    margin-left: 1.25rem;
+    list-style: decimal;
+  }
+  .prose-bezenti ol li + li {
+    margin-top: 0.5rem;
+  }
+  .prose-bezenti a {
+    color: var(--color-brand-700);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prose-bezenti a:hover {
+    color: var(--color-brand-800);
+  }
+  .prose-bezenti strong {
+    font-weight: 600;
+    color: var(--color-slate-900);
+  }
+}
+
+/*
+ * Reveal de entrada accesible y dirigido por SCROLL.
+ * Regla de oro: el contenido es visible por defecto. El estado oculto SOLO se
+ * aplica cuando <html> lleva `.reveal-on` (la añade el JS del Layout si el
+ * usuario no pide reduce-motion). Cada elemento anima al ENTRAR en el viewport
+ * (IntersectionObserver → .is-visible). Sin JS, SSR/headless, impresión o
+ * reduce-motion: todo queda visible y en su sitio.
+ *
+ * Variantes (atributo data-reveal): "" / up (por defecto), left, right, scale,
+ * clip. Escalonado con --reveal-delay (ms).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  html.reveal-on [data-reveal] {
+    opacity: 0;
+    transform: translateY(1.5rem);
+    transition:
+      opacity 0.7s var(--ease-out-quint),
+      transform 0.7s var(--ease-out-quint),
+      clip-path 0.7s var(--ease-out-quint);
+    transition-delay: var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+
+  html.reveal-on [data-reveal="left"] {
+    transform: translateX(-2.5rem);
+  }
+  html.reveal-on [data-reveal="right"] {
+    transform: translateX(2.5rem);
+  }
+  html.reveal-on [data-reveal="scale"] {
+    transform: scale(0.94);
+  }
+  html.reveal-on [data-reveal="clip"] {
+    transform: none;
+    clip-path: inset(0 0 100% 0);
+  }
+
+  html.reveal-on [data-reveal].is-visible {
+    opacity: 1;
+    transform: none;
+    clip-path: inset(0 0 0 0);
+  }
+}

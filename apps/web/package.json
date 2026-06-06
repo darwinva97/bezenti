@@ -1,0 +1,31 @@
+{
+  "name": "web",
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "typecheck": "astro check",
+    "lint": "echo \"(no linter configured for web)\"",
+    "clean": "rm -rf dist .astro .wrangler",
+    "cf:dev": "astro build && wrangler dev",
+    "deploy": "astro build && wrangler deploy"
+  },
+  "dependencies": {
+    "@astrojs/preact": "^5.1.0",
+    "@repo/ui": "workspace:*",
+    "astro": "^5.7.0",
+    "preact": "^10.29.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.0",
+    "@cloudflare/workers-types": "^4.0.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/react": "^19.2.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.0.0"
+  }
+}

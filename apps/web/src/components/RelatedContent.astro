@@ -1,0 +1,50 @@
+---
+import MediaCard from "./MediaCard.astro";
+import { useTranslations, type Locale } from "../i18n/utils";
+import type { TopicKey } from "../i18n/topics";
+import { getRelated, type ContentType } from "../lib/related";
+
+interface Props {
+  locale: Locale;
+  topics: TopicKey[];
+  exclude: { type: ContentType; id: string };
+}
+
+const { locale, topics, exclude } = Astro.props;
+const t = useTranslations(locale);
+const related = await getRelated({ locale, topics, exclude, limit: 6 });
+
+const typeLabel: Record<ContentType, string> = {
+  service: t("type.service"),
+  project: t("type.project"),
+  post: t("type.post"),
+};
+const typeColor: Record<ContentType, string> = {
+  service: "text-brand-600",
+  project: "text-coral-600",
+  post: "text-teal-600",
+};
+---
+
+{
+  related.length > 0 && (
+    <section class="mt-12 border-t border-slate-200 pt-8">
+      <h2 class="u-display text-xl font-bold text-slate-900">{t("related.title")}</h2>
+      <div class="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {related.map((r, i) => (
+          <MediaCard
+            href={r.href}
+            title={r.title}
+            description={r.description}
+            image={r.cardImage ?? r.image}
+            imageAlt={r.imageAlt}
+            eyebrow={typeLabel[r.type]}
+            eyebrowClass={typeColor[r.type]}
+            reveal
+            revealDelay={(i % 3) * 80}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}

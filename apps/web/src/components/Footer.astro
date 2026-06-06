@@ -1,0 +1,239 @@
+---
+import { getPath, useTranslations, type Locale } from "../i18n/utils";
+import type { RouteKey } from "../i18n/routes";
+import { officesByCountry } from "../lib/offices";
+
+interface Props {
+    locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const year = new Date().getFullYear();
+
+const explore: { key: RouteKey; label: string }[] = [
+    { key: "services", label: t("nav.services") },
+    { key: "portfolio", label: t("nav.portfolio") },
+    { key: "blog", label: t("nav.blog") },
+    { key: "contact", label: t("nav.contact") },
+];
+
+const offices = officesByCountry();
+---
+
+<footer class="bg-slate-950 text-slate-300">
+    <div class="mx-auto max-w-7xl px-4 pt-14 sm:px-6 lg:px-8">
+        {/* Newsletter: siempre presente, arriba del footer. */}
+        <section
+            class="relative isolate overflow-hidden rounded-3xl bg-slate-900 p-8 ring-1 ring-white/10 sm:p-10 lg:p-12"
+        >
+            <div
+                class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,var(--color-brand-600),transparent_60%)] opacity-30"
+                aria-hidden="true"
+            >
+            </div>
+            <div class="grid items-center gap-8 lg:grid-cols-[1.1fr_1fr]">
+                <div>
+                    <h2
+                        class="u-display text-2xl font-bold text-white sm:text-3xl"
+                    >
+                        {t("newsletter.title")}
+                    </h2>
+                    <p class="mt-3 max-w-md text-slate-400">
+                        {t("newsletter.subtitle")}
+                    </p>
+                </div>
+                <form id="newsletter-form" class="w-full" novalidate>
+                    {/* honeypot anti-spam */}
+                    <input
+                        type="text"
+                        name="company"
+                        tabindex="-1"
+                        autocomplete="off"
+                        aria-hidden="true"
+                        class="hidden"
+                    />
+                    <div class="flex flex-col gap-3 sm:flex-row">
+                        <label for="newsletter-email" class="sr-only"
+                            >{t("newsletter.placeholder")}</label
+                        >
+                        <input
+                            id="newsletter-email"
+                            name="email"
+                            type="email"
+                            required
+                            placeholder={t("newsletter.placeholder")}
+                            class="w-full rounded-full border border-white/15 bg-white/5 px-5 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-brand-400 focus:ring-2 focus:ring-brand-500/30"
+                        />
+                        <button
+                            type="submit"
+                            id="newsletter-button"
+                            class="shrink-0 rounded-full bg-brand-600 px-6 py-3 font-medium text-white transition-colors hover:bg-brand-500 disabled:opacity-60"
+                        >
+                            {t("newsletter.button")}
+                        </button>
+                    </div>
+                    <p
+                        id="newsletter-status"
+                        role="status"
+                        aria-live="polite"
+                        class="mt-3 min-h-5 text-sm"
+                    >
+                    </p>
+                </form>
+            </div>
+        </section>
+
+        <div
+            class="grid gap-10 pt-14 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr]"
+        >
+            {/* Marca + blurb + CTA */}
+            <div class="max-w-sm">
+                <a
+                    href={getPath(locale, "home")}
+                    class="flex items-center gap-2 text-white"
+                    aria-label="Bezenti — inicio"
+                >
+                    <img
+                        src="/logo.svg"
+                        alt=""
+                        width="241"
+                        height="260"
+                        class="h-8 w-auto"
+                    />
+                    <span
+                        class="text-xl"
+                        style="font-family: var(--font-display)">bezenti</span
+                    >
+                </a>
+                <p class="mt-1 text-sm font-medium text-brand-300">
+                    {t("site.tagline")}
+                </p>
+                <p class="mt-4 text-sm leading-relaxed text-slate-400">
+                    {t("footer.blurb")}
+                </p>
+                <a
+                    href={getPath(locale, "contact")}
+                    class="group mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-white transition-colors hover:text-brand-300"
+                >
+                    {t("footer.cta")}
+                    <span
+                        class="transition-transform group-hover:translate-x-0.5"
+                        aria-hidden="true">→</span
+                    >
+                </a>
+            </div>
+
+            {/* Explorar */}
+            <nav aria-label={t("footer.explore")}>
+                <h2
+                    class="text-xs font-semibold uppercase tracking-wider text-slate-400"
+                >
+                    {t("footer.explore")}
+                </h2>
+                <ul class="mt-4 space-y-2.5">
+                    {
+                        explore.map(({ key, label }) => (
+                            <li>
+                                <a
+                                    href={getPath(locale, key)}
+                                    class="text-sm text-slate-300 transition-colors hover:text-white"
+                                >
+                                    {label}
+                                </a>
+                            </li>
+                        ))
+                    }
+                </ul>
+            </nav>
+
+            {/* Sedes */}
+            <div>
+                <h2
+                    class="text-xs font-semibold uppercase tracking-wider text-slate-400"
+                >
+                    {t("footer.offices")}
+                </h2>
+                <ul class="mt-4 space-y-2.5">
+                    {
+                        offices.map((g) => (
+                            <li class="text-sm text-slate-400">
+                                <span class="font-medium text-slate-200">
+                                    {g.name[locale]}
+                                </span>
+                                <span class="text-slate-400">
+                                    {" "}
+                                    · {g.cities.map((c) => c.city).join(", ")}
+                                </span>
+                            </li>
+                        ))
+                    }
+                </ul>
+            </div>
+        </div>
+
+        {/* Línea inferior */}
+        <div
+            class="mt-14 border-t border-white/10 pb-12 pt-6 text-sm text-slate-400"
+        >
+            © {year} Bezenti. {t("footer.rights")}
+        </div>
+    </div>
+</footer>
+
+<script
+    is:inline
+    define:vars={{
+        labels: {
+            sending: t("newsletter.sending"),
+            success: t("newsletter.success"),
+            error: t("newsletter.error"),
+        },
+    }}
+>
+    (function () {
+        var form = document.getElementById("newsletter-form");
+        if (!form) return;
+        var btn = document.getElementById("newsletter-button");
+        var status = document.getElementById("newsletter-status");
+        var email = document.getElementById("newsletter-email");
+        var defaultLabel = btn ? btn.textContent : "";
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            status.className = "mt-3 min-h-5 text-sm text-slate-400";
+            status.textContent = labels.sending;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = labels.sending;
+            }
+
+            var data = {
+                email: email.value,
+                company:
+                    (form.querySelector("[name=company]") || {}).value || "",
+            };
+            fetch("/api/subscribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            })
+                .then(function (r) {
+                    if (!r.ok) throw new Error(String(r.status));
+                    status.className = "mt-3 min-h-5 text-sm text-success-500";
+                    status.textContent = labels.success;
+                    form.reset();
+                })
+                .catch(function () {
+                    status.className = "mt-3 min-h-5 text-sm text-coral-500";
+                    status.textContent = labels.error;
+                })
+                .finally(function () {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = defaultLabel;
+                    }
+                });
+        });
+    })();
+</script>

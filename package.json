@@ -1,0 +1,25 @@
+{
+  "name": "bezenti",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.23.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "preview": "turbo run preview",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "deploy": "turbo run deploy",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.9.16"
+  },
+  "dependencies": {
+    "agent-browser": "^0.27.1"
+  }
+}

@@ -1,0 +1,91 @@
+---
+/**
+ * Tarjeta con imagen de portada arriba y contenido debajo. Reutilizable para
+ * servicios, proyectos, posts y contenido relacionado. Toda la tarjeta es un
+ * enlace. Si no hay `image`, se omite la zona de imagen (degrada con elegancia).
+ */
+interface Props {
+  href: string;
+  title: string;
+  description?: string;
+  image?: string;
+  imageAlt?: string;
+  /** Texto pequeño sobre el título (categoría, tipo…). */
+  eyebrow?: string;
+  /** Clase de color para el eyebrow (p. ej. "text-coral-600"). */
+  eyebrowClass?: string;
+  /** Texto pequeño bajo el contenido (fecha, etc.). */
+  meta?: string;
+  /** Proporción de la imagen (por defecto cuadrada, para rejillas de tarjetas). */
+  aspect?: string;
+  /** Carga prioritaria (para imágenes visibles al inicio). */
+  eager?: boolean;
+  /** Anima la entrada al hacer scroll (degrada a visible sin JS/reduce-motion). */
+  reveal?: boolean;
+  /** Retardo del reveal en ms (para escalonar dentro de una rejilla). */
+  revealDelay?: number;
+  /** Si se define, la tarjeta es filtrable: categoría para `FilterBar`. */
+  filterCategory?: string;
+  /** Topics (separados por espacio) para filtrar por tags. */
+  filterTopics?: string;
+  class?: string;
+}
+
+const {
+  href,
+  title,
+  description,
+  image,
+  imageAlt,
+  eyebrow,
+  eyebrowClass = "text-brand-600",
+  meta,
+  aspect = "aspect-square",
+  eager = false,
+  reveal = false,
+  revealDelay = 0,
+  filterCategory,
+  filterTopics,
+  class: extra = "",
+} = Astro.props;
+---
+
+<a
+  href={href}
+  class:list={["group block", extra]}
+  data-reveal={reveal ? "" : undefined}
+  style={reveal && revealDelay ? `--reveal-delay:${revealDelay}ms` : undefined}
+  data-filter-item={filterCategory !== undefined ? "" : undefined}
+  data-category={filterCategory}
+  data-topics={filterTopics}
+>
+  <article
+    class="flex h-full flex-col overflow-hidden rounded-card border border-slate-200 bg-white shadow-sm transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-1 group-hover:border-slate-300 group-hover:shadow-lg group-hover:shadow-slate-900/5"
+  >
+    {
+      image && (
+        <div class:list={["overflow-hidden bg-slate-100", aspect]}>
+          <img
+            src={image}
+            alt={imageAlt ?? ""}
+            loading={eager ? "eager" : "lazy"}
+            decoding="async"
+            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        </div>
+      )
+    }
+    <div class="flex flex-1 flex-col p-5">
+      {
+        eyebrow && (
+          <span class:list={["text-xs font-medium uppercase tracking-wide", eyebrowClass]}>
+            {eyebrow}
+          </span>
+        )
+      }
+      <h3 class="mt-1 font-semibold text-slate-900 transition-colors group-hover:text-brand-600">{title}</h3>
+      {description && <p class="mt-1 line-clamp-2 text-sm text-slate-500">{description}</p>}
+      {meta && <p class="mt-3 text-xs text-slate-500">{meta}</p>}
+    </div>
+  </article>
+</a>

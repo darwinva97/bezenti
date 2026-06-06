@@ -1,0 +1,59 @@
+---
+interface Crumb {
+  label: string;
+  href?: string;
+}
+
+interface Props {
+  items: Crumb[];
+}
+
+const { items } = Astro.props;
+
+// JSON-LD BreadcrumbList con URLs absolutas (rich result en Google).
+const itemListElement = items
+  .filter((c) => c.href)
+  .map((c, i) => ({
+    "@type": "ListItem",
+    position: i + 1,
+    name: c.label,
+    item: new URL(c.href!, Astro.site).toString(),
+  }));
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement,
+};
+---
+
+<nav aria-label="Breadcrumb" class="mb-6 text-sm text-slate-500">
+  <ol class="flex flex-wrap items-center gap-1.5">
+    {
+      items.map((c, i) => (
+        <li class="flex items-center gap-1.5">
+          {i > 0 && <span class="text-slate-300">/</span>}
+          {c.href ? (
+            <a href={c.href} class="hover:text-slate-900">
+              {c.label}
+            </a>
+          ) : (
+            <span aria-current="page" class="text-slate-700">
+              {c.label}
+            </span>
+          )}
+        </li>
+      ))
+    }
+  </ol>
+</nav>
+
+{
+  itemListElement.length > 0 && (
+    <script
+      is:inline
+      type="application/ld+json"
+      set:html={JSON.stringify(jsonLd)}
+    />
+  )
+}

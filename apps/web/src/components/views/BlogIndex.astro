@@ -1,0 +1,108 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import MediaCard from "../MediaCard.astro";
+import PageHero from "../PageHero.astro";
+import FilterBar from "../FilterBar.astro";
+import { getAlternateLinks, getPath, useTranslations, type Locale } from "../../i18n/utils";
+import { postHref } from "../../lib/urls";
+import { projectCategories, categoryName, type ProjectCategoryKey } from "../../i18n/categories";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+
+const posts = (await getCollection("posts"))
+  .filter((p) => p.data.locale === locale && !p.data.draft)
+  .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
+
+const [lead, ...rest] = posts;
+const fmt = new Intl.DateTimeFormat(locale, { dateStyle: "long" });
+const featuredLabel = locale === "es" ? "Lo último" : "Latest";
+
+// Filtros = categorías presentes entre los artículos filtrables (el resto, sin
+// el destacado). Escala a medida que crece el blog.
+const filters = projectCategories
+  .filter((c) => rest.some((p) => p.data.category === c.key))
+  .map((c) => ({ value: c.key, label: categoryName(locale, c.key as ProjectCategoryKey) }));
+---
+
+<Layout
+  locale={locale}
+  activeNav="blog"
+  title={t("blog.title")}
+  description={t("blog.subtitle")}
+  alternates={getAlternateLinks("blog")}
+  heroOverlay
+  breadcrumbs={[
+    { label: t("nav.home"), href: getPath(locale, "home") },
+    { label: t("blog.title") },
+  ]}
+>
+  <PageHero
+    slot="hero"
+    title={t("blog.title")}
+    subtitle={t("blog.subtitle")}
+    image="/images/banners/blog.jpg"
+  />
+
+  {/* Artículo destacado: tarjeta horizontal grande con imagen a sangre. */}
+  {lead && (
+    <a
+      href={postHref(locale, lead.data.slug)}
+      data-reveal
+      class="group grid overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-lg lg:grid-cols-2"
+    >
+      <div class="relative aspect-[16/10] overflow-hidden bg-slate-100 lg:aspect-auto">
+        {lead.data.image && (
+          <img
+            src={lead.data.image}
+            alt={lead.data.imageAlt ?? ""}
+            loading="eager"
+            decoding="async"
+            class="h-full w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
+          />
+        )}
+      </div>
+      <div class="flex flex-col justify-center p-7 sm:p-10">
+        <span class="text-xs font-semibold uppercase tracking-wider text-brand-600">{featuredLabel}</span>
+        <h2 class="u-display mt-3 text-2xl font-bold text-slate-900 transition-colors group-hover:text-brand-600 sm:text-3xl">
+          {lead.data.title}
+        </h2>
+        <p class="mt-3 text-slate-600">{lead.data.description}</p>
+        <time datetime={lead.data.pubDate.toISOString()} class="mt-5 text-sm text-slate-500">
+          {fmt.format(lead.data.pubDate)}
+        </time>
+      </div>
+    </a>
+  )}
+
+  {rest.length > 0 && (
+    <div id="blog" class="mt-10">
+      {filters.length > 1 && (
+        <div data-reveal class="mb-8">
+          <FilterBar scope="blog" allLabel={t("filter.all")} filters={filters} />
+        </div>
+      )}
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {rest.map((p, i) => (
+          <MediaCard
+            href={postHref(locale, p.data.slug)}
+            title={p.data.title}
+            description={p.data.description}
+            image={p.data.cardImage ?? p.data.image}
+            imageAlt={p.data.imageAlt}
+            meta={fmt.format(p.data.pubDate)}
+            filterCategory={p.data.category}
+            filterTopics={p.data.topics.join(" ")}
+            reveal
+            revealDelay={(i % 3) * 80}
+          />
+        ))}
+      </div>
+    </div>
+  )}
+</Layout>

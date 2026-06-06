@@ -1,0 +1,33 @@
+{
+  "name": "dashboard",
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "build": "vite build && cp dist/client/_shell.html dist/client/index.html",
+    "preview": "vite preview --port 3000",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo \"(no linter configured for dashboard)\"",
+    "clean": "rm -rf dist .output .tanstack .vinxi node_modules/.vite",
+    "cf:dev": "pnpm build && wrangler dev",
+    "deploy": "pnpm build && wrangler deploy"
+  },
+  "dependencies": {
+    "@repo/ui": "workspace:*",
+    "@tanstack/react-router": "^1.170.0",
+    "@tanstack/react-start": "^1.168.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@tanstack/react-router-devtools": "^1.167.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

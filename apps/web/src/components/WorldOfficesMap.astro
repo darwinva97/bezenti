@@ -1,0 +1,65 @@
+---
+/**
+ * Mapa mundial con los países de las sedes resaltados y un marcador animado por
+ * ciudad. Los marcadores se inyectan en el <slot> del SVG, así comparten el
+ * sistema de coordenadas del mapa (proyección equirectangular 1000×500).
+ */
+import WorldMap from "./WorldMap.astro";
+import { offices, project } from "../lib/offices";
+import type { Locale } from "../i18n/config";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const markers = offices.map((o) => ({ ...o, ...project(o.lon, o.lat) }));
+---
+
+<div class="overflow-hidden rounded-card border border-slate-200 bg-slate-50 p-3 sm:p-5">
+  <WorldMap>
+    {
+      markers.map((m) => (
+        <g>
+          <title>{`${m.city}, ${m.countryName[locale]}`}</title>
+          <circle cx={m.x} cy={m.y} r="5" class="wm-pulse" />
+          <circle cx={m.x} cy={m.y} r="2.3" class="wm-dot" />
+        </g>
+      ))
+    }
+  </WorldMap>
+</div>
+
+<style>
+  .wm-dot {
+    fill: var(--color-coral-600);
+    stroke: #fff;
+    stroke-width: 0.8;
+  }
+  .wm-pulse {
+    fill: var(--color-coral-500);
+    opacity: 0.4;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: wm-pulse 2.4s ease-out infinite;
+  }
+  @keyframes wm-pulse {
+    0% {
+      transform: scale(0.4);
+      opacity: 0.5;
+    }
+    70% {
+      transform: scale(2.2);
+      opacity: 0;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wm-pulse {
+      animation: none;
+      opacity: 0.3;
+    }
+  }
+</style>

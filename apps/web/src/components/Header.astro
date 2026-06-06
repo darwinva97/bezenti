@@ -1,0 +1,228 @@
+---
+import LanguageSwitcher from "./LanguageSwitcher.astro";
+import SearchBox from "./SearchBox.astro";
+import { useTranslations, type Locale } from "../i18n/utils";
+import { getPath } from "../i18n/utils";
+import type { RouteKey } from "../i18n/routes";
+
+interface Props {
+  locale: Locale;
+  activeNav?: RouteKey;
+  alternates: { locale: Locale; href: string }[];
+  /**
+   * Si es true, el header empieza TRANSPARENTE sobre el hero (comparten fondo)
+   * y se vuelve sólido al hacer scroll. Si es false, es sólido siempre.
+   */
+  overlay?: boolean;
+}
+
+const { locale, activeNav, alternates, overlay = false } = Astro.props;
+const t = useTranslations(locale);
+
+// El contacto se muestra aparte como botón outline, no como link del menú.
+const navItems: { key: RouteKey; label: string }[] = [
+  { key: "services", label: t("nav.services") },
+  { key: "portfolio", label: t("nav.portfolio") },
+  { key: "blog", label: t("nav.blog") },
+];
+---
+
+<header
+  id="site-header"
+  data-overlay={overlay ? "true" : "false"}
+  data-solid={overlay ? "false" : "true"}
+  class="group/h fixed inset-x-0 top-0 z-50 transition-colors duration-300 data-[solid=true]:border-b data-[solid=true]:border-slate-200 data-[solid=true]:bg-white/90 data-[solid=true]:backdrop-blur data-[solid=true]:shadow-sm"
+>
+  {/* Logo a la izquierda; el resto (links + idioma + contacto) como bloque a la derecha. */}
+  <div class="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-3 sm:px-6 lg:px-8">
+    <a
+      href={getPath(locale, "home")}
+      class="flex items-center gap-2 text-white transition-colors group-data-[solid=true]/h:text-brand-600"
+      aria-label="Bezenti — inicio"
+    >
+      <img src="/logo.svg" alt="" width="241" height="260" class="h-8 w-auto" />
+      <span class="text-xl" style="font-family: var(--font-display)">bezenti</span>
+    </a>
+
+    <div class="flex items-center gap-3 sm:gap-4">
+      <nav class="hidden items-center gap-1 sm:flex">
+        {
+          navItems.map(({ key, label }) => (
+            <a
+              href={getPath(locale, key)}
+              aria-current={key === activeNav ? "page" : undefined}
+              class:list={[
+                "rounded px-3 py-1.5 text-sm font-medium transition-colors",
+                key === activeNav
+                  ? "text-white underline underline-offset-8 group-data-[solid=true]/h:text-brand-600 group-data-[solid=true]/h:no-underline"
+                  : "text-white/90 hover:text-white group-data-[solid=true]/h:text-slate-600 group-data-[solid=true]/h:hover:text-slate-900",
+              ]}
+            >
+              {label}
+            </a>
+          ))
+        }
+      </nav>
+
+      <a
+        href={getPath(locale, "contact")}
+        aria-current={activeNav === "contact" ? "page" : undefined}
+        class="hidden rounded-lg border px-4 py-1.5 text-sm font-medium transition-colors sm:inline-block border-white/60 text-white hover:bg-white hover:text-slate-900 group-data-[solid=true]/h:border-brand-600 group-data-[solid=true]/h:text-brand-600 group-data-[solid=true]/h:hover:bg-brand-600 group-data-[solid=true]/h:hover:text-white"
+      >
+        {t("nav.contact")}
+      </a>
+
+      <SearchBox locale={locale} />
+
+      <LanguageSwitcher locale={locale} alternates={alternates} />
+
+      {/* Botón hamburguesa: solo móvil. Controla el panel de navegación. */}
+      <button
+        type="button"
+        id="nav-toggle"
+        aria-controls="mobile-nav"
+        aria-expanded="false"
+        aria-label={t("nav.menu")}
+        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/10 group-data-[solid=true]/h:text-slate-900 group-data-[solid=true]/h:hover:bg-slate-100 sm:hidden"
+      >
+        {/* Icono hamburguesa ↔ X: dos trazos que rotan según aria-expanded. */}
+        <span class="hamburger" aria-hidden="true">
+          <span class="bar"></span>
+          <span class="bar"></span>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  {/* Panel de navegación móvil: solapa bajo la barra, fondo sólido. */}
+  <div
+    id="mobile-nav"
+    hidden
+    class="border-t border-slate-200 bg-white shadow-lg sm:hidden"
+  >
+    <nav class="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4">
+      {
+        navItems.map(({ key, label }) => (
+          <a
+            href={getPath(locale, key)}
+            aria-current={key === activeNav ? "page" : undefined}
+            class:list={[
+              "rounded-lg px-3 py-2.5 text-base font-medium transition-colors",
+              key === activeNav
+                ? "bg-brand-50 text-brand-700"
+                : "text-slate-700 hover:bg-slate-50",
+            ]}
+          >
+            {label}
+          </a>
+        ))
+      }
+      <a
+        href={getPath(locale, "contact")}
+        aria-current={activeNav === "contact" ? "page" : undefined}
+        class="mt-2 rounded-lg bg-brand-600 px-3 py-2.5 text-center text-base font-medium text-white transition-colors hover:bg-brand-700"
+      >
+        {t("nav.contact")}
+      </a>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .hamburger {
+    position: relative;
+    display: block;
+    width: 1.25rem;
+    height: 1rem;
+  }
+  .hamburger .bar {
+    position: absolute;
+    left: 0;
+    height: 2px;
+    width: 1.25rem;
+    border-radius: 9999px;
+    background-color: currentColor;
+    transition:
+      transform 0.3s var(--ease-out-quint),
+      top 0.3s var(--ease-out-quint),
+      bottom 0.3s var(--ease-out-quint);
+  }
+  .hamburger .bar:first-child {
+    top: 0.25rem;
+  }
+  .hamburger .bar:last-child {
+    bottom: 0.25rem;
+  }
+  #nav-toggle[aria-expanded="true"] .bar:first-child {
+    top: 0.4375rem;
+    transform: rotate(45deg);
+  }
+  #nav-toggle[aria-expanded="true"] .bar:last-child {
+    bottom: 0.4375rem;
+    transform: rotate(-45deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hamburger .bar {
+      transition: none;
+    }
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    var h = document.getElementById("site-header");
+    if (!h) return;
+
+    // 1 · Header transparente → sólido al hacer scroll (solo en modo overlay).
+    if (h.dataset.overlay === "true") {
+      var onScroll = function () {
+        h.dataset.solid = window.scrollY > 24 ? "true" : "false";
+      };
+      onScroll();
+      window.addEventListener("scroll", onScroll, { passive: true });
+    }
+
+    // 2 · Menú móvil: toggle accesible con Escape, click fuera y cierre al navegar.
+    var toggle = document.getElementById("nav-toggle");
+    var panel = document.getElementById("mobile-nav");
+    if (!toggle || !panel) return;
+
+    function setOpen(open) {
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      panel.hidden = !open;
+    }
+
+    toggle.addEventListener("click", function () {
+      setOpen(toggle.getAttribute("aria-expanded") !== "true");
+    });
+
+    // Cerrar al pulsar un enlace del panel.
+    panel.addEventListener("click", function (e) {
+      if (e.target.closest("a")) setOpen(false);
+    });
+
+    // Cerrar con Escape (y devolver el foco al botón).
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+
+    // Cerrar al hacer click fuera del header.
+    document.addEventListener("click", function (e) {
+      if (
+        toggle.getAttribute("aria-expanded") === "true" &&
+        !h.contains(e.target)
+      ) {
+        setOpen(false);
+      }
+    });
+
+    // Si se pasa a desktop con el panel abierto, resetear estado.
+    var mq = window.matchMedia("(min-width: 640px)");
+    mq.addEventListener("change", function (e) {
+      if (e.matches) setOpen(false);
+    });
+  })();
+</script>
