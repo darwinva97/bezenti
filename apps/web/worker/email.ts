@@ -77,6 +77,14 @@ function renderEmail(opts: {
   return { subject, html, text };
 }
 
+/** Convierte "Nombre <correo@dominio>" en { name, email }. */
+function parseFrom(raw: string | undefined, fallbackEmail: string): { name?: string; email: string } {
+  if (!raw) return { name: "Bezenti", email: fallbackEmail };
+  const m = raw.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1] || undefined, email: m[2].trim() };
+  return { email: raw.trim() };
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 }
@@ -88,9 +96,12 @@ function escapeHtml(s: string): string {
 export async function sendNewsletter(
   env: MailEnv,
   post: PostByLocale,
-): Promise<{ sent: number; failed: number; total: number }> {
+): Promise<{ sent: number; failed: number; total: number; errors: string[] }> {
   const site = env.SITE_URL ?? "https://bezenti.com";
-  const from = env.SMTP_FROM ?? `Bezenti <${env.SMTP_USER}>`;
+  // El sobre MAIL FROM debe ser SOLO la dirección; el nombre va aparte. Si se
+  // pasa "Nombre <correo>" como string, worker-mailer lo usa entero y el SMTP
+  // lo rechaza (501 Bad sender). Por eso lo parseamos a { name, email }.
+  const from = parseFrom(env.SMTP_FROM, env.SMTP_USER);
 
   const { results } = await env.DB.prepare(
     "SELECT email, token, locale FROM subscribers WHERE status = 'active'",
@@ -113,6 +124,7 @@ export async function sendNewsletter(
 
   let sent = 0;
   let failed = 0;
+  const errors: string[] = [];
   try {
     for (const r of recipients) {
       const loc = (r.locale === "en" ? "en" : "es") as "es" | "en";
@@ -129,12 +141,13 @@ export async function sendNewsletter(
       try {
         await mailer.send({ from, to: { email: r.email }, subject, text, html });
         sent++;
-      } catch {
+      } catch (e) {
         failed++;
+        if (errors.length < 3) errors.push(String((e as Error)?.message ?? e));
       }
     }
   } finally {
     await mailer.close().catch(() => {});
   }
-  return { sent, failed, total: recipients.length };
+  return { sent, failed, total: recipients.length, errors };
 }
