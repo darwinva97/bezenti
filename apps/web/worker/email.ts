@@ -171,6 +171,63 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 }
 
+const WELCOME = {
+  es: {
+    subject: "Bienvenido a la newsletter de Bezenti",
+    hi: "¡Gracias por suscribirte!",
+    body: "A partir de ahora te enviaremos nuestros artículos sobre web, ecommerce, SEO, marketing y automatización, pensados para hacer crecer tu negocio. Sin spam, y te das de baja cuando quieras.",
+    cta: "Ver el blog",
+    unsub: "Darme de baja",
+  },
+  en: {
+    subject: "Welcome to the Bezenti newsletter",
+    hi: "Thanks for subscribing!",
+    body: "From now on we'll send you our articles on web, ecommerce, SEO, marketing and automation, written to help grow your business. No spam, and you can unsubscribe anytime.",
+    cta: "Read the blog",
+    unsub: "Unsubscribe",
+  },
+};
+
+/** Correo de bienvenida al suscribirse (newsletter@). */
+export async function sendWelcome(
+  env: MailEnv,
+  sub: { email: string; token: string; locale: "es" | "en" },
+): Promise<void> {
+  const c = WELCOME[sub.locale];
+  const site = env.SITE_URL ?? "https://bezenti.com";
+  const from = parseFrom(env.SMTP_FROM, env.SMTP_USER);
+  const blogUrl = `${site}/${sub.locale}/blog`;
+  const unsubUrl = `${site}/api/unsubscribe?email=${encodeURIComponent(sub.email)}&token=${sub.token}`;
+  const html = `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0"><tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
+      <tr><td style="background:#0f172a;padding:20px 28px"><span style="color:#fff;font-size:20px;font-weight:700">bezenti</span></td></tr>
+      <tr><td style="padding:28px">
+        <h1 style="margin:0 0 12px;color:#0f172a;font-size:20px">${c.hi}</h1>
+        <p style="margin:0 0 22px;color:#475569;font-size:15px;line-height:1.6">${c.body}</p>
+        <a href="${blogUrl}" style="display:inline-block;background:#1f6feb;color:#fff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:9999px">${c.cta} →</a>
+      </td></tr>
+      <tr><td style="padding:18px 28px;border-top:1px solid #e2e8f0"><p style="margin:0;color:#94a3b8;font-size:12px"><a href="${unsubUrl}" style="color:#64748b">${c.unsub}</a> · <a href="${site}" style="color:#64748b">bezenti.com</a></p></td></tr>
+    </table></td></tr></table></body></html>`;
+  await WorkerMailer.send(
+    {
+      host: env.SMTP_HOST,
+      port: Number(env.SMTP_PORT) || 465,
+      secure: env.SMTP_SECURE !== "false",
+      startTls: env.SMTP_SECURE === "false",
+      credentials: { username: env.SMTP_USER, password: env.SMTP_PASSWORD },
+      authType: ["plain", "login"],
+    },
+    {
+      from,
+      to: { email: sub.email },
+      subject: c.subject,
+      text: `${c.hi}\n\n${c.body}\n\n${c.cta}: ${blogUrl}\n\n${c.unsub}: ${unsubUrl}`,
+      html,
+    },
+  );
+}
+
 /**
  * Envía un post a todos los suscriptores activos, cada uno en su idioma y con su
  * propio enlace de baja. Devuelve un resumen {sent, failed}.

@@ -30,7 +30,7 @@ interface Env {
   ADMIN_SECRET: string;
 }
 
-import { sendNewsletter, sendContact, type PostByLocale } from "./email";
+import { sendNewsletter, sendContact, sendWelcome, type PostByLocale } from "./email";
 
 const LOCALES = ["es", "en"] as const;
 // Si en "/" no hay cookie ni el Accept-Language coincide con un idioma
@@ -115,7 +115,7 @@ function localeFromReferer(referer: string | null): string {
 }
 
 /** Función del Worker: alta en la newsletter (footer). Persiste en D1. */
-async function handleSubscribe(request: Request, env: Env): Promise<Response> {
+async function handleSubscribe(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   if (request.method !== "POST") {
     return Response.json({ ok: false, error: "method" }, { status: 405 });
   }
@@ -141,7 +141,14 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
   }
 
   const token = crypto.randomUUID();
-  const locale = localeFromReferer(request.headers.get("Referer"));
+  const locale = localeFromReferer(request.headers.get("Referer")) === "en" ? "en" : "es";
+
+  // ¿Es un alta nueva? (para enviar bienvenida solo la primera vez).
+  const existing = await env.DB.prepare(
+    "SELECT 1 FROM subscribers WHERE email = ?1",
+  )
+    .bind(email)
+    .first();
 
   // Alta idempotente: si ya existe, se reactiva (por si se había dado de baja).
   // El token original se conserva (no se sobrescribe en el conflicto).
@@ -152,6 +159,15 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
   )
     .bind(email, token, locale, Date.now())
     .run();
+
+  // Correo de bienvenida (solo a altas nuevas), en segundo plano.
+  if (!existing) {
+    ctx.waitUntil(
+      sendWelcome(env, { email, token, locale }).catch((e) =>
+        console.error("[welcome-email]", e),
+      ),
+    );
+  }
 
   return Response.json({ ok: true });
 }
@@ -262,7 +278,7 @@ export default {
     }
 
     if (url.pathname === "/api/subscribe") {
-      return handleSubscribe(request, env);
+      return handleSubscribe(request, env, ctx);
     }
 
     if (url.pathname === "/api/unsubscribe") {
