@@ -42,10 +42,10 @@ jobs:
           command: deploy
 
       # App frontend independiente (generador de firmas) en email-signature.bezenti.com.
+      # Es assets-only y sin package.json, así que se despliega con npx wrangler.
       - name: Deploy email-signature
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/email-signature
-          command: deploy
+        working-directory: apps/email-signature
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy
