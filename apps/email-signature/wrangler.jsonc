@@ -1,0 +1,14 @@
+{
+  "$schema": "../web/node_modules/wrangler/config-schema.json",
+  "name": "email-signature",
+  "compatibility_date": "2026-01-01",
+  // App frontend independiente (generador de firmas). Sirve solo archivos
+  // estáticos desde ./public; sin Worker script (assets-only). La privacidad la
+  // da Cloudflare Access sobre el host, y se refuerza con WAF.
+  "routes": [{ "pattern": "email-signature.bezenti.com", "custom_domain": true }],
+  "assets": {
+    "directory": "./public",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "single-page-application"
+  }
+}
