@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "por-que-tu-web-carga-lenta",
-      "category": "web",
-      "topics": [
-        "performance",
-        "seo"
-      ],
-      "es": "Por qué tu web carga lenta y cómo arreglarlo",
-      "en": "Why your website loads slowly and how to fix it"
-    },
-    {
       "key": "automatizar-presupuestos-y-facturas",
       "category": "automation",
       "topics": [
@@ -298,6 +288,17 @@
       ],
       "es": "WordPress o web a medida: cómo decidir para tu negocio",
       "en": "WordPress or custom: how to decide for your business",
+      "publishedAt": "2026-06-07"
+    },
+    {
+      "key": "por-que-tu-web-carga-lenta",
+      "category": "web",
+      "topics": [
+        "performance",
+        "seo"
+      ],
+      "es": "Por qué tu web carga lenta y cómo arreglarlo",
+      "en": "Why your website loads slowly and how to fix it",
       "publishedAt": "2026-06-07"
     }
   ]
