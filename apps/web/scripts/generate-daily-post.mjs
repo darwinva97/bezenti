@@ -164,19 +164,10 @@ async function main() {
   queue.used.push({ ...item, publishedAt: new Date().toISOString().slice(0, 10) });
   writeFileSync(QUEUE, JSON.stringify(queue, null, 2) + "\n");
 
-  // Encola el post para el envío de la newsletter (lo procesa el Cron del Worker).
+  // Escribe el payload para el envío. El workflow lo encola en `outbox` DESPUÉS
+  // del deploy (así el cron nunca manda un enlace a un post aún no publicado).
   const payload = { es: pes, en: pen };
-  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACC}/d1/database/${DB_ID}/query`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${TOK}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sql: "INSERT INTO outbox (payload, created_at) VALUES (?, ?)",
-      params: [JSON.stringify(payload), String(Date.now())],
-    }),
-  });
-  const jr = await r.json();
-  if (!jr.success) throw new Error("Outbox insert falló: " + JSON.stringify(jr.errors));
-  console.log("Encolado en outbox para envío.");
+  if (process.env.POST_OUT) writeFileSync(process.env.POST_OUT, JSON.stringify(payload));
   if (out) {
     appendFileSync(out, "generated=true\n");
     appendFileSync(out, `key=${item.key}\n`);

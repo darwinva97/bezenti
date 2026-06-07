@@ -64,6 +64,19 @@ jobs:
           workingDirectory: apps/web
           command: deploy
 
-      # El envío de la newsletter lo hace el Cron Trigger del Worker leyendo la
-      # cola `outbox` (el generador ya encoló el post). Así no llamamos al
+      # Encola el post en `outbox` (D1) SOLO tras desplegar. El Cron Trigger del
+      # Worker (13:30 UTC) lee la cola y envía la newsletter. No llamamos al
       # endpoint público desde Actions (lo bloquea el WAF de la zona).
+      - name: Enqueue newsletter
+        if: steps.gen.outputs.generated == 'true'
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACC: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          PAYLOAD=$(cat /tmp/post.json)
+          BODY=$(jq -n --arg p "$PAYLOAD" --arg t "$(date +%s)000" \
+            '{sql:"INSERT INTO outbox (payload, created_at) VALUES (?, ?)", params:[$p,$t]}')
+          curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACC/d1/database/91cc0789-0647-45b5-a4b0-2079802a4c80/query" \
+            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+            --data "$BODY" -w "\nHTTP %{http_code}\n"
