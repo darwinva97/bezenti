@@ -19,6 +19,88 @@ export interface MailEnv {
   SITE_URL?: string; // https://bezenti.com
 }
 
+/** Config SMTP de la cuenta de contacto (separada de la newsletter). */
+export interface ContactEnv {
+  SMTP_HOST: string;
+  SMTP_PORT: string;
+  SMTP_SECURE?: string;
+  CONTACT_SMTP_USER: string;
+  CONTACT_SMTP_PASSWORD: string;
+  CONTACT_SMTP_FROM?: string; // "Bezenti <contact@bezenti.com>"
+  SITE_URL?: string;
+}
+
+const CONTACT_COPY = {
+  es: {
+    subject: "Hemos recibido tu mensaje",
+    hi: (n) => `Hola ${n},`,
+    body: "Gracias por escribirnos. Hemos recibido tu mensaje y te responderemos lo antes posible.",
+    yours: "Tu mensaje:",
+    sign: "Equipo Bezenti",
+  },
+  en: {
+    subject: "We received your message",
+    hi: (n) => `Hi ${n},`,
+    body: "Thanks for reaching out. We've received your message and will get back to you as soon as possible.",
+    yours: "Your message:",
+    sign: "The Bezenti team",
+  },
+};
+
+/**
+ * Envía dos correos por la cuenta de contacto: confirmación al usuario y aviso
+ * al equipo (a la propia cuenta de contacto, con reply-to del usuario).
+ */
+export async function sendContact(
+  env: ContactEnv,
+  data: { name: string; email: string; message: string; locale: "es" | "en" },
+): Promise<void> {
+  const c = CONTACT_COPY[data.locale];
+  const site = env.SITE_URL ?? "https://bezenti.com";
+  const from = parseFrom(env.CONTACT_SMTP_FROM, env.CONTACT_SMTP_USER);
+  const mailer = await WorkerMailer.connect({
+    host: env.SMTP_HOST,
+    port: Number(env.SMTP_PORT) || 465,
+    secure: env.SMTP_SECURE !== "false",
+    startTls: env.SMTP_SECURE === "false",
+    credentials: { username: env.CONTACT_SMTP_USER, password: env.CONTACT_SMTP_PASSWORD },
+    authType: ["plain", "login"],
+  });
+  try {
+    // 1) Confirmación al usuario.
+    const confHtml = `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0"><tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
+      <tr><td style="background:#0f172a;padding:20px 28px"><span style="color:#fff;font-size:20px;font-weight:700">bezenti</span></td></tr>
+      <tr><td style="padding:28px">
+        <p style="margin:0 0 12px;color:#0f172a;font-size:16px">${escapeHtml(c.hi(data.name))}</p>
+        <p style="margin:0 0 18px;color:#475569;font-size:15px;line-height:1.6">${c.body}</p>
+        <p style="margin:0 0 6px;color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:.04em">${c.yours}</p>
+        <p style="margin:0;color:#334155;font-size:14px;line-height:1.6;white-space:pre-wrap;border-left:3px solid #e2e8f0;padding-left:12px">${escapeHtml(data.message)}</p>
+      </td></tr>
+      <tr><td style="padding:18px 28px;border-top:1px solid #e2e8f0"><p style="margin:0;color:#94a3b8;font-size:12px">${c.sign} · <a href="${site}" style="color:#64748b">bezenti.com</a></p></td></tr>
+    </table></td></tr></table></body></html>`;
+    await mailer.send({
+      from,
+      to: { name: data.name, email: data.email },
+      subject: `${c.subject} · Bezenti`,
+      text: `${c.hi(data.name)}\n\n${c.body}\n\n${c.yours}\n${data.message}\n\n— ${c.sign}\n${site}`,
+      html: confHtml,
+    });
+
+    // 2) Aviso al equipo (a la cuenta de contacto), respondible al usuario.
+    await mailer.send({
+      from,
+      to: { email: env.CONTACT_SMTP_USER },
+      reply: { name: data.name, email: data.email },
+      subject: `Nuevo contacto: ${data.name}`,
+      text: `Nombre: ${data.name}\nEmail: ${data.email}\nIdioma: ${data.locale}\n\nMensaje:\n${data.message}`,
+    });
+  } finally {
+    await mailer.close().catch(() => {});
+  }
+}
+
 /** Datos del post por idioma para construir el correo. */
 export interface PostByLocale {
   es?: { slug: string; title: string; description: string };

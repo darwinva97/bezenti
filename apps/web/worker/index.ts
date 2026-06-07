@@ -22,11 +22,15 @@ interface Env {
   SMTP_PASSWORD: string;
   SMTP_FROM?: string;
   SITE_URL?: string;
+  // --- Cuenta de contacto (formulario): contact@bezenti.com ---
+  CONTACT_SMTP_USER: string;
+  CONTACT_SMTP_PASSWORD: string;
+  CONTACT_SMTP_FROM?: string;
   /** Secreto para autorizar el envío manual/cron (/api/admin/send). */
   ADMIN_SECRET: string;
 }
 
-import { sendNewsletter, type PostByLocale } from "./email";
+import { sendNewsletter, sendContact, type PostByLocale } from "./email";
 
 const LOCALES = ["es", "en"] as const;
 // Si en "/" no hay cookie ni el Accept-Language coincide con un idioma
@@ -57,7 +61,7 @@ function pickLocale(header: string | null): string {
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 /** Función del Worker: recibe el formulario de contacto. */
-async function handleContact(request: Request): Promise<Response> {
+async function handleContact(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   if (request.method !== "POST") {
     return Response.json({ ok: false, error: "method" }, { status: 405 });
   }
@@ -85,9 +89,21 @@ async function handleContact(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "validation" }, { status: 400 });
   }
 
-  // TODO entrega real: reenviar a un email (Resend/MailChannels), guardar en
-  // KV/D1 o llamar a un webhook. Requiere credenciales como secretos del Worker.
-  console.log("[contact]", { name, email, message: message.slice(0, 200) });
+  const locale = localeFromReferer(request.headers.get("Referer")) === "en" ? "en" : "es";
+
+  // Guarda el mensaje (red de seguridad) y envía los correos en segundo plano
+  // (confirmación al usuario + aviso al equipo) sin bloquear la respuesta.
+  await env.DB.prepare(
+    "INSERT INTO messages (name, email, message, locale, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+  )
+    .bind(name, email, message, locale, Date.now())
+    .run();
+
+  ctx.waitUntil(
+    sendContact(env, { name, email, message, locale }).catch((e) =>
+      console.error("[contact-email]", e),
+    ),
+  );
 
   return Response.json({ ok: true });
 }
@@ -238,11 +254,11 @@ export default {
     ctx.waitUntil(processOutbox(env));
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === "/api/contact") {
-      return handleContact(request);
+      return handleContact(request, env, ctx);
     }
 
     if (url.pathname === "/api/subscribe") {
