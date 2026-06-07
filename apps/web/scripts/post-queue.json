@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "wordpress-o-a-medida",
-      "category": "web",
-      "topics": [
-        "wordpress",
-        "performance"
-      ],
-      "es": "WordPress o web a medida: cómo decidir para tu negocio",
-      "en": "WordPress or custom: how to decide for your business"
-    },
-    {
       "key": "por-que-tu-web-carga-lenta",
       "category": "web",
       "topics": [
@@ -298,6 +288,17 @@
       "es": "Cinco errores comunes en tiendas online que te cuestan ventas",
       "en": "Five common online store mistakes that cost you sales",
       "publishedAt": "2026-06-06"
+    },
+    {
+      "key": "wordpress-o-a-medida",
+      "category": "web",
+      "topics": [
+        "wordpress",
+        "performance"
+      ],
+      "es": "WordPress o web a medida: cómo decidir para tu negocio",
+      "en": "WordPress or custom: how to decide for your business",
+      "publishedAt": "2026-06-07"
     }
   ]
 }
