@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Generador de firmas · Bezenti</title>
+    <style>
+      @font-face {
+        font-family: "Bezenti";
+        src: url("/fonts/Bezenti-Regular.woff2") format("woff2");
+        font-weight: 400 700;
+        font-display: swap;
+      }
+      :root {
+        --brand: #1f6feb;
+        --ink: #0f172a;
+        --muted: #475569;
+        --line: #e2e8f0;
+        --bg: #f1f5f9;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.5;
+      }
+      .wrap { max-width: 1000px; margin: 0 auto; padding: 32px 20px 64px; }
+      header.top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+      header.top img { height: 30px; }
+      header.top span { font-family: "Bezenti", sans-serif; font-size: 22px; color: var(--brand); }
+      h1 { font-family: "Bezenti", sans-serif; font-size: clamp(1.6rem, 1rem + 2.5vw, 2.4rem); margin: 14px 0 4px; }
+      .sub { color: var(--muted); margin: 0 0 28px; }
+      .grid { display: grid; gap: 24px; grid-template-columns: 1fr; }
+      @media (min-width: 820px) { .grid { grid-template-columns: 1fr 1.1fr; align-items: start; } }
+      .card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 24px; }
+      label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; }
+      label:first-child { margin-top: 0; }
+      input {
+        width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
+        font-size: 15px; color: var(--ink); outline: none; transition: border-color .15s, box-shadow .15s;
+      }
+      input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(31,111,235,.15); }
+      .preview-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: 12px; }
+      .preview { background: #fff; border: 1px dashed var(--line); border-radius: 12px; padding: 22px; overflow: auto; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+      button {
+        font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; border-radius: 9999px;
+        padding: 11px 20px; border: 1px solid transparent; transition: background-color .15s, border-color .15s, color .15s;
+      }
+      .btn-primary { background: var(--brand); color: #fff; }
+      .btn-primary:hover { background: #1654c4; }
+      .btn-ghost { background: #fff; color: var(--ink); border-color: var(--line); }
+      .btn-ghost:hover { border-color: #94a3b8; }
+      .status { font-size: 13px; color: #19a974; min-height: 18px; margin-top: 10px; font-weight: 600; }
+      details { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 16px; }
+      summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+      details ol { color: var(--muted); font-size: 14px; padding-left: 18px; }
+      details li { margin: 6px 0; }
+      code.html-out {
+        display: none; white-space: pre-wrap; word-break: break-word; background: #0f172a; color: #cbd5e1;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 16px; border-radius: 12px; margin-top: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <img src="/logo.svg" alt="" />
+        <span>bezenti</span>
+      </header>
+      <h1>Generador de firmas</h1>
+      <p class="sub">Rellena tus datos, copia la firma y pégala en tu cliente de correo. Logo y tipografía de Bezenti incluidos.</p>
+
+      <div class="grid">
+        <div class="card">
+          <label for="name">Nombre completo</label>
+          <input id="name" type="text" placeholder="Darwin Vásquez" autocomplete="name" />
+          <label for="role">Cargo</label>
+          <input id="role" type="text" placeholder="Desarrollo y diseño" />
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="darwin@bezenti.com" autocomplete="email" />
+          <label for="phone">Teléfono (opcional)</label>
+          <input id="phone" type="tel" placeholder="+51 999 999 999" />
+          <div class="actions">
+            <button class="btn-primary" id="copy">Copiar firma</button>
+            <button class="btn-ghost" id="copyHtml">Copiar HTML</button>
+          </div>
+          <div class="status" id="status"></div>
+          <details>
+            <summary>Cómo pegarla en tu correo</summary>
+            <ol>
+              <li><strong>Gmail:</strong> Ajustes → Ver todos los ajustes → Firma → Crear → pega con Ctrl/Cmd+V → Guardar cambios.</li>
+              <li><strong>Outlook:</strong> Archivo → Opciones → Correo → Firmas → Nueva → pega → Aceptar.</li>
+              <li>Si el logo no aparece, asegúrate de pegar con formato (no como texto plano).</li>
+            </ol>
+          </details>
+        </div>
+
+        <div class="card">
+          <div class="preview-label">Vista previa</div>
+          <div class="preview" id="preview"></div>
+          <code class="html-out" id="htmlOut"></code>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const LOGO = "https://bezenti.com/email/bezenti-logo.png";
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) =>
+        String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+      function build() {
+        const name = $("name").value.trim() || "Tu Nombre";
+        const role = $("role").value.trim() || "Tu cargo";
+        const email = $("email").value.trim() || "tucorreo@bezenti.com";
+        const phone = $("phone").value.trim();
+        const phoneLine = phone
+          ? '<a href="tel:' + esc(phone.replace(/\s+/g, "")) + '" style="color:#475569;text-decoration:none;">' + esc(phone) + "</a><br>"
+          : "";
+        return (
+'<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;color:#0f172a;">' +
+  "<tr>" +
+    '<td style="padding-right:18px;vertical-align:middle;">' +
+      '<img src="' + LOGO + '" alt="Bezenti" width="170" style="display:block;border:0;outline:none;text-decoration:none;">' +
+    "</td>" +
+    '<td style="padding-left:18px;border-left:2px solid #e2e8f0;vertical-align:middle;">' +
+      '<div style="font-size:16px;font-weight:bold;color:#0f172a;">' + esc(name) + "</div>" +
+      '<div style="font-size:13px;font-weight:bold;color:#1f6feb;margin-top:2px;">' + esc(role) + "</div>" +
+      '<div style="margin-top:8px;color:#475569;font-size:12px;line-height:1.7;">' +
+        '<a href="mailto:' + esc(email) + '" style="color:#475569;text-decoration:none;">' + esc(email) + "</a><br>" +
+        phoneLine +
+        '<a href="https://bezenti.com" style="color:#1f6feb;text-decoration:none;font-weight:bold;">bezenti.com</a>' +
+      "</div>" +
+    "</td>" +
+  "</tr>" +
+"</table>"
+        );
+      }
+
+      function render() {
+        const html = build();
+        $("preview").innerHTML = html;
+        $("htmlOut").textContent = html;
+      }
+
+      function flash(msg) {
+        $("status").textContent = msg;
+        setTimeout(() => ($("status").textContent = ""), 2600);
+      }
+
+      async function copyRich() {
+        const html = build();
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/html": new Blob([html], { type: "text/html" }),
+              "text/plain": new Blob([$("preview").innerText], { type: "text/plain" }),
+            }),
+          ]);
+          flash("✓ Firma copiada. Pégala en tu correo con Ctrl/Cmd+V.");
+        } catch {
+          // Fallback: seleccionar el nodo y copiar.
+          const range = document.createRange();
+          range.selectNode($("preview"));
+          const sel = getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          document.execCommand("copy");
+          sel.removeAllRanges();
+          flash("✓ Firma copiada.");
+        }
+      }
+
+      async function copyHtml() {
+        try {
+          await navigator.clipboard.writeText(build());
+          flash("✓ HTML copiado.");
+        } catch {
+          $("htmlOut").style.display = "block";
+          flash("Copia el HTML mostrado abajo.");
+        }
+      }
+
+      ["name", "role", "email", "phone"].forEach((id) => $(id).addEventListener("input", render));
+      $("copy").addEventListener("click", copyRich);
+      $("copyHtml").addEventListener("click", copyHtml);
+      render();
+    </script>
+  </body>
+</html>
