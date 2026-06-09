@@ -2,15 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "como-elegir-un-dominio",
-      "category": "servers",
-      "topics": [
-        "domains"
-      ],
-      "es": "Cómo elegir un buen dominio para tu marca",
-      "en": "How to choose a good domain for your brand"
-    },
-    {
       "key": "correo-profesional-propio-dominio",
       "category": "servers",
       "topics": [
@@ -302,6 +293,16 @@
       "es": "Google Ads o Meta Ads: cuál conviene a tu negocio",
       "en": "Google Ads or Meta Ads: which suits your business",
       "publishedAt": "2026-06-08"
+    },
+    {
+      "key": "como-elegir-un-dominio",
+      "category": "servers",
+      "topics": [
+        "domains"
+      ],
+      "es": "Cómo elegir un buen dominio para tu marca",
+      "en": "How to choose a good domain for your brand",
+      "publishedAt": "2026-06-09"
     }
   ]
 }
