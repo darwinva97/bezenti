@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "correo-profesional-propio-dominio",
-      "category": "servers",
-      "topics": [
-        "email",
-        "domains"
-      ],
-      "es": "Por qué necesitas correo profesional con tu propio dominio",
-      "en": "Why you need professional email on your own domain"
-    },
-    {
       "key": "que-es-un-crm-y-cuando-lo-necesitas",
       "category": "systems",
       "topics": [
@@ -303,6 +293,17 @@
       "es": "Cómo elegir un buen dominio para tu marca",
       "en": "How to choose a good domain for your brand",
       "publishedAt": "2026-06-09"
+    },
+    {
+      "key": "correo-profesional-propio-dominio",
+      "category": "servers",
+      "topics": [
+        "email",
+        "domains"
+      ],
+      "es": "Por qué necesitas correo profesional con tu propio dominio",
+      "en": "Why you need professional email on your own domain",
+      "publishedAt": "2026-06-10"
     }
   ]
 }
