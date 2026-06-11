@@ -125,9 +125,7 @@ apt-get install -y -q curl wget gnupg2 ca-certificates lsb-release apt-transport
 log "Instalando NGINX Unit + PHP 8.3..."
 curl -fsSL https://unit.nginx.org/keys/nginx-keyring.gpg \\
   | gpg --dearmor > /usr/share/keyrings/nginx-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/nginx-keyring.gpg] \\
-  https://packages.nginx.org/unit/debian/ \\$(lsb_release -cs) unit" \\
-  > /etc/apt/sources.list.d/unit.list
+echo "deb [signed-by=/usr/share/keyrings/nginx-keyring.gpg] https://packages.nginx.org/unit/debian/ $(lsb_release -cs) unit" > /etc/apt/sources.list.d/unit.list
 apt-get update -y -q
 apt-get install -y -q unit unit-php
 # PHP extensions para aplicaciones web típicas
