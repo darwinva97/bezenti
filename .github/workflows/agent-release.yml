@@ -1,0 +1,40 @@
+name: Release Agent
+
+# Crea un release con los binarios compilados cada vez que se hace push de un
+# tag con el formato agent-vX.Y.Z (ej: git tag agent-v0.2.0 && git push --tags)
+on:
+  push:
+    tags:
+      - 'agent-v*'
+
+permissions:
+  contents: write  # necesario para crear releases
+
+jobs:
+  build-and-release:
+    name: Build & release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/agent/go.mod
+          cache-dependency-path: apps/agent/go.sum
+
+      - name: Build binaries
+        working-directory: apps/agent
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
+            go build -ldflags="-s -w" -o bezenti-agent-linux-amd64 .
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
+            go build -ldflags="-s -w" -o bezenti-agent-linux-arm64 .
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            apps/agent/bezenti-agent-linux-amd64
+            apps/agent/bezenti-agent-linux-arm64
+          generate_release_notes: true

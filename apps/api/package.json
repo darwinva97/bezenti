@@ -1,0 +1,27 @@
+{
+  "name": "@bezenti/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev":       "wrangler dev",
+    "deploy":    "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "lint":      "echo \"(no linter configured for api)\"",
+    "clean":     "rm -rf dist .wrangler"
+  },
+  "dependencies": {
+    "@bezenti/auth": "workspace:*",
+    "@bezenti/db":   "workspace:*",
+    "drizzle-orm":   "^0.44.2",
+    "hono":          "^4.7.11",
+    "ssh2":          "^1.16.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250525.0",
+    "@types/node":               "^22.0.0",
+    "@types/ssh2":               "^1.15.5",
+    "typescript":                "^5.9.0",
+    "wrangler":                  "^4.0.0"
+  }
+}

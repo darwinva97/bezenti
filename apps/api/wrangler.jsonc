@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bezenti-api",
+  "account_id": "39f3db3a2ce79188fddf0cb83e72f8be",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bezenti",
+      "database_id": "91cc0789-0647-45b5-a4b0-2079802a4c80",
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ],
+
+  "vars": {
+    "ENVIRONMENT":      "development",
+    // URL pública donde están los binarios del agente compilados.
+    // Actualizar cuando haya un release: ej https://r2.bezenti.com/releases/v1.0
+    "AGENT_BINARY_URL": ""
+  }
+}

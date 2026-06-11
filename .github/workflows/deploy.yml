@@ -1,7 +1,5 @@
 name: Deploy to Cloudflare
 
-# Despliega apps/web (Astro SSG + Worker) en cada push a main. El bot de posts
-# diarios hace commit aquí, y este workflow reconstruye y publica solo.
 on:
   push:
     branches: [main]
@@ -15,37 +13,68 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # ── apps/web (blog Astro) ──────────────────────────────────────────────────
+  deploy-web:
+    name: Deploy web
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build web
-        run: pnpm --filter web build
-
-      - name: Deploy web to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web build
+      - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/web
           command: deploy
-
-      # App frontend independiente (generador de firmas) en email-signature.bezenti.com.
-      # Es assets-only y sin package.json, así que se despliega con npx wrangler.
       - name: Deploy email-signature
         working-directory: apps/email-signature
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@4 deploy
+
+  # ── apps/api (Hono Worker — control plane) ────────────────────────────────
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: apps/api
+          command: deploy
+
+  # ── apps/panel (TanStack Start SPA — backoffice + portal) ────────────────
+  deploy-panel:
+    name: Deploy panel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build panel
+        run: pnpm --filter @bezenti/panel build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: apps/panel
+          command: deploy
