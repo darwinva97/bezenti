@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
-import { AdminLayout } from "../../index";
-import { authClient } from "../../../lib/auth";
+import { AdminLayout } from "../index";
+import { authClient } from "../../lib/auth";
 
 export const Route = createFileRoute("/_authed/nodes/")({
   component: NodesPage,

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PortalLayout } from "../../index";
+import { PortalLayout } from "../index";
 
 export const Route = createFileRoute("/_authed/databases/")({
   component: DatabasesPage,
