@@ -1,0 +1,115 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+
+	"github.com/go-chi/chi/v5"
+
+	"bezenti/agent/internal/services"
+)
+
+// appKey estable por proyecto — no cambia aunque se renombre el subdominio,
+// así el rename solo recablea listeners sin tocar la app (ni el cert futuro).
+func projectAppKey(projectID string) string {
+	return "proj_" + strings.ReplaceAll(projectID, "-", "")
+}
+
+type createProjectReq struct {
+	ID            string   `json:"id"`
+	LinuxUser     string   `json:"linux_user"`
+	DocPath       string   `json:"doc_path"`
+	PhpVersion    string   `json:"php_version"`
+	MemoryLimitMB int      `json:"memory_limit_mb"`
+	MaxProcesses  int      `json:"max_processes"`
+	Hosts         []string `json:"hosts"`
+}
+
+func CreateProject(w http.ResponseWriter, r *http.Request) {
+	var req createProjectReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.ID == "" || req.LinuxUser == "" || req.DocPath == "" || len(req.Hosts) == 0 {
+		http.Error(w, "id, linux_user, doc_path y hosts son requeridos", http.StatusBadRequest)
+		return
+	}
+
+	sys := services.System{}
+	if err := sys.EnsureDir(req.LinuxUser, req.DocPath); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	appKey := projectAppKey(req.ID)
+	docRoot := "/var/www/" + req.LinuxUser + "/" + req.DocPath + "/public"
+	unit := services.NginxUnit{}
+	if err := unit.CreateProjectApp(appKey, req.LinuxUser, docRoot, req.MemoryLimitMB, req.MaxProcesses); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, host := range req.Hosts {
+		if err := unit.SetHostRoute(host, appKey); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{"app": appKey, "doc_root": docRoot})
+}
+
+// DeleteProject quita listeners y la app de Unit. Conserva los archivos del
+// docroot — el borrado de datos del cliente es decisión aparte.
+func DeleteProject(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "projectID")
+
+	var req struct {
+		Hosts []string `json:"hosts"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	unit := services.NginxUnit{}
+	for _, host := range req.Hosts {
+		unit.RemoveHostRoute(host) //nolint — best effort
+	}
+	unit.DeleteApp(projectAppKey(projectID))
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// SetProjectHosts recablea los listeners de un proyecto (rename de subdominio
+// o de accountSlug): quita los hosts viejos y agrega los nuevos apuntando a
+// la MISMA app — el contenido y la config no se tocan.
+func SetProjectHosts(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "projectID")
+
+	var req struct {
+		Add    []string `json:"add"`
+		Remove []string `json:"remove"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	appKey := projectAppKey(projectID)
+	unit := services.NginxUnit{}
+
+	// Primero agregar los nuevos (si falla, los viejos siguen sirviendo)
+	for _, host := range req.Add {
+		if err := unit.SetHostRoute(host, appKey); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	for _, host := range req.Remove {
+		unit.RemoveHostRoute(host) //nolint — best effort
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

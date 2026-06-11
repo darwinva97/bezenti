@@ -29,6 +29,12 @@
     "ENVIRONMENT":      "development",
     // URL pública (bucket R2 bezenti-releases) con los binarios del agente.
     // Subir nuevas versiones con: wrangler r2 object put bezenti-releases/agent/<ver>/...
-    "AGENT_BINARY_URL": "https://pub-3e6d113c18ae41ee97b4d7c22906b39c.r2.dev/agent/v0.2.2"
+    "AGENT_BINARY_URL": "https://pub-3e6d113c18ae41ee97b4d7c22906b39c.r2.dev/agent/v0.2.4",
+    // Subdominios Bezenti por proyecto (el ruteo es por header Host; funciona
+    // aunque el wildcard DNS aún no exista — Fase B)
+    "PAGES_DOMAIN":     "pages.bezenti.com",
+    // Vacío hasta el wildcard *.db.bezenti.com (Fase B) — mientras, el host de
+    // DB que se muestra al cliente es la IP pública del node
+    "DB_DOMAIN":        ""
   }
 }

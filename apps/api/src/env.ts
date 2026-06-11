@@ -11,4 +11,10 @@ export type Env = {
   // URL base donde están los binarios del agente para descarga
   // ej: https://releases.bezenti.com o URL de Cloudflare R2 pública
   AGENT_BINARY_URL:  string;
+  // Dominio base de los subdominios Bezenti por proyecto, ej: "pages.bezenti.com".
+  // El host de un proyecto se computa <subdomain>--<accountSlug>.<PAGES_DOMAIN>.
+  PAGES_DOMAIN:      string;
+  // Dominio base del alias DNS de la base de datos, ej: "db.bezenti.com".
+  // Vacío hasta que exista el wildcard DNS (Fase B) — fallback: IP del node.
+  DB_DOMAIN:         string;
 };

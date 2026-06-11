@@ -9,6 +9,9 @@ export const clients = sqliteTable("clients", {
   nodeId:           text("node_id").notNull().references(() => nodes.id),
   planId:           text("plan_id").notNull().references(() => plans.id),
   linuxUser:        text("linux_user").notNull().unique(),
+  // Slug público de la cuenta — la parte <cuenta> de <proyecto>--<cuenta>.pages.bezenti.com.
+  // Editable por el cliente; nullable para filas previas (se genera lazy al primer uso).
+  accountSlug:      text("account_slug").unique(),
   sftpPasswordHash: text("sftp_password_hash").notNull(),
   status:           text("status", {
     enum: ["active", "suspended", "deleted"],

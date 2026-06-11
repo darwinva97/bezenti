@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -43,6 +44,38 @@ func (System) CreateUser(username, password string, diskMB int) error {
 		slog.Warn("setquota failed — continuando sin cuota de disco", "user", username, "err", err)
 	}
 	return nil
+}
+
+// EnsureDir crea el docroot de un proyecto (/var/www/<user>/<docPath>/public)
+// y deja un index.php placeholder si el directorio estaba vacío.
+func (System) EnsureDir(username, docPath string) error {
+	if docPath == "" || strings.Contains(docPath, "..") || strings.ContainsAny(docPath, "/\\") {
+		return fmt.Errorf("docPath inválido: %q", docPath)
+	}
+	dir := "/var/www/" + username + "/" + docPath
+	pub := dir + "/public"
+	if err := run("mkdir", "-p", pub); err != nil {
+		return err
+	}
+	idx := pub + "/index.php"
+	if _, err := os.Stat(idx); os.IsNotExist(err) {
+		placeholder := `<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Sitio en construcción — Bezenti</title></head>
+<body style="font-family:system-ui;display:grid;place-items:center;min-height:90vh;color:#374151">
+<div style="text-align:center">
+<h1 style="font-weight:600">Sitio en construcción</h1>
+<p><code><?php echo htmlspecialchars($_SERVER['HTTP_HOST'] ?? ''); ?></code></p>
+<p style="color:#9ca3af;font-size:14px">Sube tus archivos por SFTP a <code><?php echo htmlspecialchars(basename(dirname(__DIR__))); ?>/public</code></p>
+</div>
+</body>
+</html>
+`
+		if err := os.WriteFile(idx, []byte(placeholder), 0o644); err != nil {
+			return fmt.Errorf("placeholder index.php: %w", err)
+		}
+	}
+	return run("chown", "-R", username+":"+username, dir)
 }
 
 func (System) DeleteUser(username string) error {

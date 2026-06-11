@@ -3,6 +3,26 @@ import { createDb, clients, nodes, plans, user } from "@bezenti/db";
 import { eq, desc } from "drizzle-orm";
 import type { Env } from "../env";
 import { bytesToHex, sha256 } from "./provision";
+import { slugify, randomSlugSuffix } from "../lib/slug";
+
+// Slug de cuenta por defecto, derivado del nombre/email del usuario.
+// Único (reintenta con sufijo aleatorio) y acotado para dejar espacio al
+// subdominio del proyecto dentro de la etiqueta DNS de 63 chars.
+export async function generateAccountSlug(
+  db: ReturnType<typeof createDb>,
+  source: string,
+): Promise<string> {
+  let base = slugify(source).slice(0, 24).replace(/-+$/, "");
+  if (!base) base = "cuenta-" + randomSlugSuffix();
+
+  let candidate = base;
+  for (let i = 0; i < 5; i++) {
+    const taken = await db.query.clients.findFirst({ where: eq(clients.accountSlug, candidate) });
+    if (!taken) return candidate;
+    candidate = `${base}-${randomSlugSuffix()}`;
+  }
+  return `${base}-${randomSlugSuffix(8)}`;
+}
 
 export const clientsRouter = new Hono<{ Bindings: Env }>();
 
@@ -33,13 +53,16 @@ clientsRouter.post("/", async (c) => {
   const db = createDb(c.env.DB);
 
   // Resolver el usuario (por id o por email)
-  let userId = body.userId;
-  if (!userId && body.userEmail) {
-    const u = await db.query.user.findFirst({ where: eq(user.email, body.userEmail) });
-    if (!u) return c.json({ error: `No existe un usuario con email ${body.userEmail}` }, 404);
-    userId = u.id;
+  let userRow;
+  if (body.userId) {
+    userRow = await db.query.user.findFirst({ where: eq(user.id, body.userId) });
+    if (!userRow) return c.json({ error: `No existe un usuario con id ${body.userId}` }, 404);
+  } else if (body.userEmail) {
+    userRow = await db.query.user.findFirst({ where: eq(user.email, body.userEmail) });
+    if (!userRow) return c.json({ error: `No existe un usuario con email ${body.userEmail}` }, 404);
   }
-  if (!userId) return c.json({ error: "userId o userEmail es requerido" }, 400);
+  if (!userRow) return c.json({ error: "userId o userEmail es requerido" }, 400);
+  const userId = userRow.id;
 
   const existing = await db.query.clients.findFirst({ where: eq(clients.userId, userId) });
   if (existing) return c.json({ error: "Ese usuario ya tiene un cliente asignado" }, 409);
@@ -56,6 +79,7 @@ clientsRouter.post("/", async (c) => {
   const linuxUser    = "cli_" + clientId.replace(/-/g, "").slice(0, 8);
   const sftpPassword = bytesToHex(crypto.getRandomValues(new Uint8Array(12)));
   const phpVersion   = (JSON.parse(plan.phpVersions) as string[])[0] ?? "8.3";
+  const accountSlug  = await generateAccountSlug(db, userRow.name || (userRow.email.split("@")[0] ?? userRow.email));
 
   // El agente crea el usuario Linux, la app PHP en Unit y la base MariaDB
   let agentRes: Response;
@@ -95,6 +119,7 @@ clientsRouter.post("/", async (c) => {
     nodeId:           body.nodeId,
     planId:           body.planId,
     linuxUser,
+    accountSlug,
     sftpPasswordHash: await sha256(sftpPassword),
     createdAt:        new Date(),
   });
@@ -113,7 +138,10 @@ clientsRouter.post("/", async (c) => {
       name:     provisioned.db_name,
       user:     provisioned.db_user,
       password: provisioned.db_password,
-      host:     "localhost",
+      // Alias DNS <user.id>.db.bezenti.com cuando exista el wildcard (Fase B);
+      // mientras, la IP pública del node. Accesible por internet en ambos casos.
+      host:     c.env.DB_DOMAIN ? `${userId}.${c.env.DB_DOMAIN}` : node.ipPublic,
+      port:     3306,
     },
   }, 201);
 });

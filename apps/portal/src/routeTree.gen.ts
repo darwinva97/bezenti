@@ -13,6 +13,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as AuthedProjectsIndexRouteImport } from './routes/_authed/projects/index'
 import { Route as AuthedFilesIndexRouteImport } from './routes/_authed/files/index'
 import { Route as AuthedDomainsIndexRouteImport } from './routes/_authed/domains/index'
 import { Route as AuthedDatabasesIndexRouteImport } from './routes/_authed/databases/index'
@@ -34,6 +35,11 @@ const AuthedRoute = AuthedRouteImport.update({
 const AuthedIndexRoute = AuthedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProjectsIndexRoute = AuthedProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedFilesIndexRoute = AuthedFilesIndexRouteImport.update({
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/databases/': typeof AuthedDatabasesIndexRoute
   '/domains/': typeof AuthedDomainsIndexRoute
   '/files/': typeof AuthedFilesIndexRoute
+  '/projects/': typeof AuthedProjectsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/databases': typeof AuthedDatabasesIndexRoute
   '/domains': typeof AuthedDomainsIndexRoute
   '/files': typeof AuthedFilesIndexRoute
+  '/projects': typeof AuthedProjectsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/_authed/databases/': typeof AuthedDatabasesIndexRoute
   '/_authed/domains/': typeof AuthedDomainsIndexRoute
   '/_authed/files/': typeof AuthedFilesIndexRoute
+  '/_authed/projects/': typeof AuthedProjectsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -87,8 +96,16 @@ export interface FileRouteTypes {
     | '/databases/'
     | '/domains/'
     | '/files/'
+    | '/projects/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/register' | '/' | '/databases' | '/domains' | '/files'
+  to:
+    | '/login'
+    | '/register'
+    | '/'
+    | '/databases'
+    | '/domains'
+    | '/files'
+    | '/projects'
   id:
     | '__root__'
     | '/_authed'
@@ -98,6 +115,7 @@ export interface FileRouteTypes {
     | '/_authed/databases/'
     | '/_authed/domains/'
     | '/_authed/files/'
+    | '/_authed/projects/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -136,6 +154,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/projects/': {
+      id: '/_authed/projects/'
+      path: '/projects'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof AuthedProjectsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/files/': {
       id: '/_authed/files/'
       path: '/files'
@@ -165,6 +190,7 @@ interface AuthedRouteChildren {
   AuthedDatabasesIndexRoute: typeof AuthedDatabasesIndexRoute
   AuthedDomainsIndexRoute: typeof AuthedDomainsIndexRoute
   AuthedFilesIndexRoute: typeof AuthedFilesIndexRoute
+  AuthedProjectsIndexRoute: typeof AuthedProjectsIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -172,6 +198,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedDatabasesIndexRoute: AuthedDatabasesIndexRoute,
   AuthedDomainsIndexRoute: AuthedDomainsIndexRoute,
   AuthedFilesIndexRoute: AuthedFilesIndexRoute,
+  AuthedProjectsIndexRoute: AuthedProjectsIndexRoute,
 }
 
 const AuthedRouteWithChildren =

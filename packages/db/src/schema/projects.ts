@@ -7,8 +7,11 @@ export const projects = sqliteTable("projects", {
   id:          text("id").primaryKey(),
   clientId:    text("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   name:        text("name").notNull(),
-  // Dominio o subdominio completo, ej: "miapp.com" o "blog.miapp.com"
+  // Dominio o subdominio completo, ej: "miapp.com" o "blog.miapp.com".
+  // Para subdominios Bezenti guarda el host computado <subdomain>--<accountSlug>.<PAGES_DOMAIN>.
   domain:      text("domain").notNull().unique(),
+  // Etiqueta editable <proyecto> del subdominio Bezenti (null si el proyecto usa dominio propio)
+  subdomain:   text("subdomain"),
   phpVersion:  text("php_version").notNull().default("8.3"),
   // Ruta relativa dentro del home del cliente, ej: "blog" → /var/www/cli_xxx/blog/public
   docPath:     text("doc_path").notNull(),

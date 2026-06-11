@@ -150,7 +150,17 @@ apt-get install -y -q mariadb-server
 systemctl enable --now mariadb
 # Evitar que clientes vean bases de datos de otros clientes
 mysql -e "SET GLOBAL skip_show_database = ON;" 2>/dev/null || true
-log "✓ MariaDB instalado"
+# Acceso externo: los clientes se conectan por internet (usuario @'%' creado
+# por el agente). El default empaquetado es bind-address=127.0.0.1.
+cat > /etc/mysql/mariadb.conf.d/99-bezenti.cnf << 'MARIADBEOF'
+[mysqld]
+bind-address = 0.0.0.0
+MARIADBEOF
+systemctl restart mariadb
+if command -v ufw > /dev/null && ufw status | grep -q "Status: active"; then
+  ufw allow 3306/tcp || true
+fi
+log "✓ MariaDB instalado (acceso externo habilitado)"
 
 # ─── 4. SFTP via OpenSSH ────────────────────────────────────────────────────
 log "Configurando SFTP..."

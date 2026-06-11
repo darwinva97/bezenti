@@ -63,6 +63,12 @@ func main() {
 			r.Post("/{clientID}/limits", handlers.UpdateLimits)
 			r.Get("/{clientID}/metrics", handlers.GetMetrics)
 		})
+
+		r.Route("/projects", func(r chi.Router) {
+			r.Post("/", handlers.CreateProject)
+			r.Delete("/{projectID}", handlers.DeleteProject)
+			r.Post("/{projectID}/hosts", handlers.SetProjectHosts)
+		})
 	})
 
 	// Heartbeat goroutine: informa al control plane que este nodo está vivo.

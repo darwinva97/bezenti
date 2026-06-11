@@ -29,10 +29,14 @@ func (Database) CreateDatabase(username string) (DBCreds, error) {
 	dbUser := username
 	password := randHex(16)
 
+	// @localhost para la app PHP (socket) y @'%' para acceso externo por
+	// internet — la seguridad es usuario+contraseña, no el hostname.
 	stmts := []string{
 		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", dbName),
 		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, password),
 		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s'", dbUser, password),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", dbName, dbUser),
 		"FLUSH PRIVILEGES",
 	}
 
@@ -54,6 +58,7 @@ func (Database) DeleteDatabase(username string) {
 
 	db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s_db`", username))
 	db.Exec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", username))
+	db.Exec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", username))
 	db.Exec("FLUSH PRIVILEGES")
 }
 

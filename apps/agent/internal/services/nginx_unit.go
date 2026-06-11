@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"sync"
 )
 
 // El paquete Debian de NGINX Unit expone la API de control solo por
@@ -56,15 +58,126 @@ func (NginxUnit) UpdateLimits(user string, memoryMB, maxProcs int) error {
 	return unitPut("/config/applications/"+user, patch)
 }
 
-func (NginxUnit) AddListener(user, domain, docRoot string) error {
-	listener := map[string]any{
-		"pass": "applications/" + user,
+// ── Apps por PROYECTO ─────────────────────────────────────────────────────────
+// Cada proyecto tiene su propia app PHP en Unit (appKey estable derivado del
+// project id) con docroot aislado. El ruteo por hostname NO usa listeners
+// (en Unit un listener es un socket IP:puerto, no un vhost): hay UN listener
+// "*:80" que pasa a /config/routes, y cada host es un step con match.host.
+
+func (NginxUnit) CreateProjectApp(appKey, user, docRoot string, memoryMB, maxProcs int) error {
+	app := map[string]any{
+		"type":   "php",
+		"user":   user,
+		"group":  user,
+		"root":   docRoot,
+		"script": "index.php",
+		"options": map[string]any{
+			"admin": map[string]string{
+				"memory_limit": fmt.Sprintf("%dM", memoryMB),
+			},
+		},
+		"processes": map[string]any{
+			"max":          maxProcs,
+			"idle_timeout": 20,
+			"spare":        0,
+		},
 	}
-	return unitPut("/config/listeners/"+domain+":80", listener)
+	return unitPut("/config/applications/"+appKey, app)
+}
+
+// Las mutaciones de routes son read-modify-write sobre el array completo —
+// serializar para no perder steps en llamadas concurrentes.
+var routesMu sync.Mutex
+
+// SetHostRoute hace que el hostname dado sirva la app indicada (reemplaza el
+// step previo del mismo host si existía) y garantiza el listener "*:80".
+func (NginxUnit) SetHostRoute(host, appKey string) error {
+	routesMu.Lock()
+	defer routesMu.Unlock()
+
+	routes, err := getRoutes()
+	if err != nil {
+		return err
+	}
+	routes = removeHostStep(routes, host)
+	step := map[string]any{
+		"match":  map[string]any{"host": host},
+		"action": map[string]any{"pass": "applications/" + appKey},
+	}
+	// Al frente: los steps con match específico deben ir antes de un
+	// eventual catch-all al final.
+	routes = append([]any{step}, routes...)
+
+	if err := putRoutes(routes); err != nil {
+		return err
+	}
+	return ensureVhostListener()
+}
+
+func (NginxUnit) RemoveHostRoute(host string) error {
+	routesMu.Lock()
+	defer routesMu.Unlock()
+
+	routes, err := getRoutes()
+	if err != nil {
+		return err
+	}
+	return putRoutes(removeHostStep(routes, host))
+}
+
+// AddListener / RemoveListener (modelo por-cliente y dominios propios) usan el
+// mismo mecanismo de routes — un "listener" por dominio no existe en Unit.
+func (NginxUnit) AddListener(user, domain, docRoot string) error {
+	return NginxUnit{}.SetHostRoute(domain, user)
 }
 
 func (NginxUnit) RemoveListener(user, domain string) error {
-	return unitDelete("/config/listeners/" + domain + ":80")
+	return NginxUnit{}.RemoveHostRoute(domain)
+}
+
+func ensureVhostListener() error {
+	return unitPut("/config/listeners/*:80", map[string]any{"pass": "routes"})
+}
+
+func getRoutes() ([]any, error) {
+	req, _ := http.NewRequest(http.MethodGet, unitSocket+"/config/routes", nil)
+	resp, err := unitClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("unit GET /config/routes: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return []any{}, nil
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var routes []any
+	if err := json.Unmarshal(body, &routes); err != nil {
+		return nil, fmt.Errorf("unit /config/routes no es un array: %w", err)
+	}
+	return routes, nil
+}
+
+func putRoutes(routes []any) error {
+	return unitPut("/config/routes", routes)
+}
+
+func removeHostStep(routes []any, host string) []any {
+	out := make([]any, 0, len(routes))
+	for _, r := range routes {
+		step, ok := r.(map[string]any)
+		if ok {
+			if match, ok := step["match"].(map[string]any); ok {
+				if h, ok := match["host"].(string); ok && h == host {
+					continue
+				}
+			}
+		}
+		out = append(out, r)
+	}
+	return out
 }
 
 func unitPut(path string, body any) error {
@@ -80,7 +193,8 @@ func unitPut(path string, body any) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("unit PUT %s: status %d", path, resp.StatusCode)
+		detail, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unit PUT %s: status %d: %s", path, resp.StatusCode, bytes.TrimSpace(detail))
 	}
 	return nil
 }

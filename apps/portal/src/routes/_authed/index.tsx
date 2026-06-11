@@ -77,6 +77,7 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
 
   const nav = [
     { label: "Mi hosting",      to: "/" },
+    { label: "Proyectos",       to: "/projects" },
     { label: "Dominios",        to: "/domains" },
     { label: "Bases de datos",  to: "/databases" },
     { label: "Archivos",        to: "/files" },
