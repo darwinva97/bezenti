@@ -10,8 +10,11 @@ export const nodes = sqliteTable("nodes", {
   // URL base del node agent, ej: https://agent.bezenti.internal/nbg01
   // En producción el agent solo es accesible via Cloudflare Tunnel
   agentUrl:         text("agent_url").notNull(),
-  // SHA-256 del token secreto — el token real vive en Workers Secrets / env
+  // SHA-256 del token secreto — usado para validar heartbeats del agent
   agentTokenHash:   text("agent_token_hash").notNull(),
+  // Token en claro — el control plane lo envía como X-Agent-Token al llamar
+  // a la API del agent (crear clientes, dominios, etc.)
+  agentToken:       text("agent_token"),
   status:           text("status", {
     enum: ["provisioning", "ready", "degraded", "offline"],
   }).notNull().default("provisioning"),

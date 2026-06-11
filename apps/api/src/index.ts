@@ -60,6 +60,15 @@ app.use("/portal/*", async (c, next) => {
   await next();
 });
 
+// Lista de usuarios para el selector de "Nuevo cliente" del admin
+app.get("/admin/users", async (c) => {
+  const db   = createDb(c.env.DB);
+  const rows = await db.query.user.findMany({
+    columns: { id: true, email: true, name: true, role: true },
+  });
+  return c.json(rows);
+});
+
 // Provision va antes del nodes router para que /provision no sea capturado como /:id
 app.route("/admin/nodes/provision", provisionRouter);
 app.route("/admin/nodes",    nodesRouter);

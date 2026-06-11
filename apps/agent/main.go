@@ -45,17 +45,21 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(agentmw.TokenAuth(token))
 
+	// /health es público — lo usa el health check del bootstrap (sin token)
 	r.Get("/health", handlers.Health)
 
-	r.Route("/clients", func(r chi.Router) {
-		r.Post("/", handlers.CreateClient)
-		r.Delete("/{clientID}", handlers.DeleteClient)
-		r.Post("/{clientID}/domains", handlers.AddDomain)
-		r.Delete("/{clientID}/domains/{domain}", handlers.RemoveDomain)
-		r.Post("/{clientID}/limits", handlers.UpdateLimits)
-		r.Get("/{clientID}/metrics", handlers.GetMetrics)
+	r.Group(func(r chi.Router) {
+		r.Use(agentmw.TokenAuth(token))
+
+		r.Route("/clients", func(r chi.Router) {
+			r.Post("/", handlers.CreateClient)
+			r.Delete("/{clientID}", handlers.DeleteClient)
+			r.Post("/{clientID}/domains", handlers.AddDomain)
+			r.Delete("/{clientID}/domains/{domain}", handlers.RemoveDomain)
+			r.Post("/{clientID}/limits", handlers.UpdateLimits)
+			r.Get("/{clientID}/metrics", handlers.GetMetrics)
+		})
 	})
 
 	// Heartbeat goroutine: informa al control plane que este nodo está vivo.

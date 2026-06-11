@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strings"
 )
@@ -9,7 +10,7 @@ import (
 type System struct{}
 
 func (System) CreateUser(username, password string, diskMB int) error {
-	if err := run("useradd", "-m", "-d", "/var/www/"+username, "-s", "/usr/sbin/nologin", "-G", "sftp-clientes", username); err != nil {
+	if err := run("useradd", "-m", "-d", "/var/www/"+username, "-s", "/usr/sbin/nologin", "-G", "sftp-clients", username); err != nil {
 		return fmt.Errorf("useradd: %w", err)
 	}
 
@@ -36,7 +37,12 @@ func (System) CreateUser(username, password string, diskMB int) error {
 		return err
 	}
 
-	return setQuota(username, diskMB)
+	// La cuota de disco es best-effort: requiere quotas habilitadas en el
+	// filesystem (no viene por defecto en los VPS).
+	if err := setQuota(username, diskMB); err != nil {
+		slog.Warn("setquota failed — continuando sin cuota de disco", "user", username, "err", err)
+	}
+	return nil
 }
 
 func (System) DeleteUser(username string) error {

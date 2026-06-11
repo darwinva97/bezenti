@@ -4,6 +4,11 @@ import { eq } from "drizzle-orm";
 import type { Env } from "../env";
 import { sshRun } from "../lib/ssh";
 
+// Puerto del agente. DEBE ser un puerto que Cloudflare Workers permita en
+// peticiones de salida (80, 8080, 8880, 2052, 2082, 2086, 2095); de lo
+// contrario el fetch del control plane al agente devuelve error 1003.
+export const AGENT_PORT = 8080;
+
 export const provisionRouter = new Hono<{ Bindings: Env }>();
 
 // ── POST /admin/nodes/provision ───────────────────────────────────────────────
@@ -23,7 +28,7 @@ provisionRouter.post("/", async (c) => {
   const nodeId     = crypto.randomUUID();
   const agentToken = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash  = await sha256(agentToken);
-  const agentPort  = 9000;
+  const agentPort  = AGENT_PORT;
 
   const db = createDb(c.env.DB);
   await db.insert(nodes).values({
@@ -34,6 +39,7 @@ provisionRouter.post("/", async (c) => {
     ipPublic:       body.host,
     agentUrl:       `http://${body.host}:${agentPort}`,
     agentTokenHash: tokenHash,
+    agentToken,
     status:         "provisioning",
     createdAt:      new Date(),
   });
@@ -78,7 +84,7 @@ export async function bootstrapScriptHandler(
     nodeId,
     agentToken,
     apiUrl:         c.env.BETTER_AUTH_URL,
-    agentPort:      9000,
+    agentPort:      AGENT_PORT,
     agentBinaryUrl: c.env.AGENT_BINARY_URL,
   });
 

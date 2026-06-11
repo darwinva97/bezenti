@@ -3,7 +3,7 @@ import { createDb, nodes, nodeMetrics } from "@bezenti/db";
 import { eq, desc } from "drizzle-orm";
 import type { Env } from "../env";
 import { sshRun } from "../lib/ssh";
-import { bytesToHex, sha256 } from "./provision";
+import { bytesToHex, sha256, AGENT_PORT } from "./provision";
 
 export const nodesRouter = new Hono<{ Bindings: Env }>();
 
@@ -83,7 +83,13 @@ nodesRouter.post("/:id/reset", async (c) => {
 
   await db
     .update(nodes)
-    .set({ agentTokenHash: tokenHash, status: "provisioning", lastHeartbeatAt: null })
+    .set({
+      agentTokenHash: tokenHash,
+      agentToken,
+      agentUrl:       `http://${node.ipPublic}:${AGENT_PORT}`,
+      status:         "provisioning",
+      lastHeartbeatAt: null,
+    })
     .where(eq(nodes.id, id));
 
   const bootstrapUrl = `${c.env.BETTER_AUTH_URL}/bootstrap/${id}?t=${agentToken}`;

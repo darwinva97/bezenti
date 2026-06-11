@@ -2,12 +2,24 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 )
 
-const unitSocket = "http://localhost:8080"
+// El paquete Debian de NGINX Unit expone la API de control solo por
+// socket unix — no por TCP.
+const unitSocket = "http://unit"
+
+var unitClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+			return net.Dial("unix", "/var/run/control.unit.sock")
+		},
+	},
+}
 
 type NginxUnit struct{}
 
@@ -62,7 +74,7 @@ func unitPut(path string, body any) error {
 	}
 	req, _ := http.NewRequest(http.MethodPut, unitSocket+path, bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := unitClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("unit PUT %s: %w", path, err)
 	}
@@ -75,7 +87,7 @@ func unitPut(path string, body any) error {
 
 func unitDelete(path string) error {
 	req, _ := http.NewRequest(http.MethodDelete, unitSocket+path, nil)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := unitClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("unit DELETE %s: %w", path, err)
 	}
