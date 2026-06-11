@@ -57,9 +57,9 @@ jobs:
           workingDirectory: apps/api
           command: deploy
 
-  # ── apps/panel (TanStack Start SPA — backoffice + portal) ────────────────
-  deploy-panel:
-    name: Deploy panel
+  # ── apps/admin (TanStack Start SPA — panel operador) ─────────────────────
+  deploy-admin:
+    name: Deploy admin
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,12 +69,34 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build panel
-        run: pnpm --filter @bezenti/panel build
+      - name: Build admin
+        run: pnpm --filter @bezenti/admin build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: apps/panel
+          workingDirectory: apps/admin
+          command: deploy
+
+  # ── apps/portal (TanStack Start SPA — panel clientes) ────────────────────
+  deploy-portal:
+    name: Deploy portal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build portal
+        run: pnpm --filter @bezenti/portal build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: apps/portal
           command: deploy

@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bezenti-portal",
+  "account_id": "39f3db3a2ce79188fddf0cb83e72f8be",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "panel.bezenti.com/*",
+      "zone_name": "bezenti.com"
+    }
+  ]
+}
