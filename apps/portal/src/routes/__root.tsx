@@ -1,13 +1,32 @@
-import { createRootRoute, Outlet, ScrollRestoration } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import {
+  createRootRoute,
+  HeadContent,
+  Outlet,
+  Scripts,
+} from "@tanstack/react-router";
 import "../styles.css";
 
 export const Route = createRootRoute({
-  component: () => (
-    <>
-      <ScrollRestoration />
-      <Outlet />
-      <TanStackRouterDevtools />
-    </>
-  ),
+  head: () => ({
+    meta: [
+      { charSet: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: "Bezenti Panel" },
+    ],
+  }),
+  component: RootComponent,
 });
+
+function RootComponent() {
+  return (
+    <html lang="es">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <Outlet />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
