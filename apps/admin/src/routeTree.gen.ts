@@ -5,7 +5,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
-import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedNodesIndexRouteImport } from './routes/_authed/nodes/index'
 import { Route as AuthedClientsIndexRouteImport } from './routes/_authed/clients/index'
@@ -18,11 +17,6 @@ const LoginRoute = LoginRouteImport.update({
 } as any)
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedIndexRoute = AuthedIndexRouteImport.update({
@@ -47,7 +41,6 @@ const AuthedPlansIndexRoute = AuthedPlansIndexRouteImport.update({
 } as any)
 
 export const routeTree = rootRouteImport.addChildren([
-  IndexRoute,
   LoginRoute,
   AuthedRoute.addChildren([
     AuthedIndexRoute,
