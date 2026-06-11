@@ -69,6 +69,20 @@ func main() {
 			r.Delete("/{projectID}", handlers.DeleteProject)
 			r.Post("/{projectID}/hosts", handlers.SetProjectHosts)
 		})
+
+		// Explorador de archivos del cliente (rutas relativas a /var/www/<user>)
+		r.Route("/files", func(r chi.Router) {
+			r.Get("/list", handlers.FilesList)
+			r.Get("/read", handlers.FilesRead)
+			r.Get("/zip", handlers.FilesZip)
+			r.Put("/write", handlers.FilesWrite)
+			r.Post("/mkdir", handlers.FilesMkdir)
+			r.Post("/rename", handlers.FilesRename)
+			r.Post("/copy", handlers.FilesCopy)
+			r.Post("/delete", handlers.FilesDelete)
+			r.Post("/chmod", handlers.FilesChmod)
+			r.Post("/extract", handlers.FilesExtract)
+		})
 	})
 
 	// Heartbeat goroutine: informa al control plane que este nodo está vivo.

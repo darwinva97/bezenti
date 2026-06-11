@@ -22,6 +22,8 @@ accountRouter.get("/", async (c) => {
     pagesDomain: c.env.PAGES_DOMAIN,
     // Alias DNS de la DB en Fase B; mientras, la IP pública del node
     dbHost:      c.env.DB_DOMAIN ? `${user.id}.${c.env.DB_DOMAIN}` : (client.node?.ipPublic ?? null),
+    sftpHost:    client.node?.ipPublic ?? null,
+    sftpUser:    client.linuxUser,
     plan:        client.plan ? { id: client.plan.id, name: client.plan.name } : null,
   });
 });

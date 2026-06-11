@@ -29,7 +29,7 @@
     "ENVIRONMENT":      "development",
     // URL pública (bucket R2 bezenti-releases) con los binarios del agente.
     // Subir nuevas versiones con: wrangler r2 object put bezenti-releases/agent/<ver>/...
-    "AGENT_BINARY_URL": "https://pub-3e6d113c18ae41ee97b4d7c22906b39c.r2.dev/agent/v0.2.5",
+    "AGENT_BINARY_URL": "https://pub-3e6d113c18ae41ee97b4d7c22906b39c.r2.dev/agent/v0.3.0",
     // Subdominios Bezenti por proyecto — wildcard *.pages.bezenti.com (grey
     // cloud) apunta al node; cert wildcard Let's Encrypt en Unit (Fase B)
     "PAGES_DOMAIN":     "pages.bezenti.com",
