@@ -104,9 +104,24 @@ func (NginxUnit) SetHostRoute(host, appKey string) error {
 		"match":  map[string]any{"host": host},
 		"action": map[string]any{"pass": "applications/" + appKey},
 	}
-	// Al frente: los steps con match específico deben ir antes de un
-	// eventual catch-all al final.
-	routes = append([]any{step}, routes...)
+	// Antes de un eventual catch-all del final, pero después de los steps
+	// con match.scheme (el redirect http→https debe evaluarse primero).
+	idx := 0
+	for idx < len(routes) {
+		s, ok := routes[idx].(map[string]any)
+		if !ok {
+			break
+		}
+		match, ok := s["match"].(map[string]any)
+		if !ok {
+			break
+		}
+		if _, hasScheme := match["scheme"]; !hasScheme {
+			break
+		}
+		idx++
+	}
+	routes = append(routes[:idx], append([]any{step}, routes[idx:]...)...)
 
 	if err := putRoutes(routes); err != nil {
 		return err
