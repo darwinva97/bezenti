@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  ssh2@1.17.0:
+    hash: bdb1aa1d217f425f9f48101f4cb84fc69d7c41bf084c76769ebba1a6c73bbc4e
+    path: patches/ssh2@1.17.0.patch
+
 importers:
 
   .:
@@ -28,7 +33,7 @@ importers:
         version: 4.12.24
       ssh2:
         specifier: ^1.16.0
-        version: 1.17.0
+        version: 1.17.0(patch_hash=bdb1aa1d217f425f9f48101f4cb84fc69d7c41bf084c76769ebba1a6c73bbc4e)
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20250525.0
@@ -7401,7 +7406,7 @@ snapshots:
 
   srvx@0.11.16: {}
 
-  ssh2@1.17.0:
+  ssh2@1.17.0(patch_hash=bdb1aa1d217f425f9f48101f4cb84fc69d7c41bf084c76769ebba1a6c73bbc4e):
     dependencies:
       asn1: 0.2.6
       bcrypt-pbkdf: 1.0.2

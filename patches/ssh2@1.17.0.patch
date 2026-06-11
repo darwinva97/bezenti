@@ -1,0 +1,13 @@
+diff --git a/lib/agent.js b/lib/agent.js
+index bb495d1b191433c1be51929bb551bba1a8b03c1f..c755d0914ba10192ee4eb7848e4dc1c5162da2ef 100644
+--- a/lib/agent.js
++++ b/lib/agent.js
+@@ -165,7 +165,7 @@ const PageantAgent = (() => {
+   const RET_ERR_BINSTDOUT = 14;
+   const RET_ERR_BADLEN = 15;
+ 
+-  const EXEPATH = resolve(__dirname, '..', 'util/pagent.exe');
++  const EXEPATH = typeof __dirname !== 'undefined' ? resolve(__dirname, '..', 'util/pagent.exe') : '/tmp/pagent.exe';
+   const ERROR = {
+     [RET_ERR_BADARGS]: new Error('Invalid pagent.exe arguments'),
+     [RET_ERR_UNAVAILABLE]: new Error('Pageant is not running'),
