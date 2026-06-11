@@ -104,45 +104,14 @@ function NodesPage() {
                   </td>
                 </tr>
               ) : (
-                nodes.map((n) => {
-                  const st = STATUS[n.status] ?? STATUS["offline"]!;
-                  return (
-                    <tr key={n.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{n.name}</td>
-                      <td className="px-4 py-3 text-gray-600 capitalize">{n.provider}</td>
-                      <td className="px-4 py-3 font-mono text-gray-600">{n.ipPublic}</td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {n.ramMbTotal ? `${Math.round(n.ramMbTotal / 1024)} GB` : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {n.diskGbTotal ? `${n.diskGbTotal} GB` : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>
-                          {st.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {n.status !== "ready" && (
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => setResetNode(n)}
-                              className="text-xs font-medium text-blue-600 hover:underline"
-                            >
-                              Reintentar
-                            </button>
-                            <button
-                              onClick={() => handleDelete(n)}
-                              className="text-xs font-medium text-red-600 hover:underline"
-                            >
-                              Eliminar
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
+                nodes.map((n) => (
+                  <NodeTableRow
+                    key={n.id}
+                    node={n}
+                    onReset={() => setResetNode(n)}
+                    onDelete={() => handleDelete(n)}
+                  />
+                ))
               )}
             </tbody>
           </table>
@@ -401,6 +370,92 @@ function AddNodeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Node row (con info de versión del agente) ─────────────────────────────────
+
+type AgentInfo = {
+  reachable: boolean;
+  installedVersion: string | null;
+  targetVersion: string | null;
+  updateAvailable: boolean;
+};
+
+function NodeTableRow({ node, onReset, onDelete }: {
+  node: NodeRow; onReset: () => void; onDelete: () => void;
+}) {
+  const st = STATUS[node.status] ?? STATUS["offline"]!;
+  const [info, setInfo]       = useState<AgentInfo | null>(null);
+  const [updating, setUpdating] = useState(false);
+
+  async function fetchInfo() {
+    if (node.status !== "ready") return;
+    const res = await fetch(`${API}/admin/nodes/${node.id}/agent-info`, { credentials: "include" });
+    if (res.ok) setInfo(await res.json());
+  }
+
+  useEffect(() => { fetchInfo(); }, [node.id, node.status]);
+
+  async function handleUpdate() {
+    setUpdating(true);
+    try {
+      const res = await fetch(`${API}/admin/nodes/${node.id}/update-agent`, {
+        method: "POST", credentials: "include",
+      });
+      const body = await res.json();
+      if (!res.ok) { alert((body as { error?: string }).error ?? "Falló la actualización"); return; }
+      // El agente se reinicia en ~1-2s; refrescamos la versión tras un margen
+      setTimeout(fetchInfo, 6000);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  return (
+    <tr className="border-t border-gray-100 hover:bg-gray-50">
+      <td className="px-4 py-3 font-medium text-gray-900">
+        {node.name}
+        {info?.installedVersion && (
+          <span className="ml-2 text-xs font-normal text-gray-400">v{info.installedVersion}</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-gray-600 capitalize">{node.provider}</td>
+      <td className="px-4 py-3 font-mono text-gray-600">{node.ipPublic}</td>
+      <td className="px-4 py-3 text-gray-600">
+        {node.ramMbTotal ? `${Math.round(node.ramMbTotal / 1024)} GB` : "—"}
+      </td>
+      <td className="px-4 py-3 text-gray-600">
+        {node.diskGbTotal ? `${node.diskGbTotal} GB` : "—"}
+      </td>
+      <td className="px-4 py-3">
+        <span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>
+          {st.label}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          {node.status === "ready" && info?.updateAvailable && (
+            <button
+              onClick={handleUpdate}
+              disabled={updating}
+              className="text-xs font-medium text-green-600 hover:underline disabled:opacity-50"
+              title={`Actualizar a v${info.targetVersion}`}
+            >
+              {updating ? "Actualizando..." : `Actualizar → v${info.targetVersion}`}
+            </button>
+          )}
+          {node.status !== "ready" && (
+            <button onClick={onReset} className="text-xs font-medium text-blue-600 hover:underline">
+              Reintentar
+            </button>
+          )}
+          <button onClick={onDelete} className="text-xs font-medium text-red-600 hover:underline">
+            Eliminar
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }
 

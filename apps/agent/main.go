@@ -52,6 +52,9 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(agentmw.TokenAuth(token))
 
+		// Auto-actualización: el control plane envía la URL del binario nuevo
+		r.Post("/update", handlers.Update)
+
 		r.Route("/clients", func(r chi.Router) {
 			r.Post("/", handlers.CreateClient)
 			r.Delete("/{clientID}", handlers.DeleteClient)

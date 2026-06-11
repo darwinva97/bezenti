@@ -7,6 +7,14 @@ import { bytesToHex, sha256, AGENT_PORT } from "./provision";
 
 export const nodesRouter = new Hono<{ Bindings: Env }>();
 
+// Deriva la versión objetivo del agente del último segmento de AGENT_BINARY_URL,
+// ej: ".../agent/v0.2.0" → "0.2.0".
+function agentTargetVersion(binaryUrl: string | undefined): string | null {
+  if (!binaryUrl) return null;
+  const seg = binaryUrl.replace(/\/+$/, "").split("/").pop() ?? "";
+  return seg.replace(/^v/, "") || null;
+}
+
 nodesRouter.get("/", async (c) => {
   const db   = createDb(c.env.DB);
   const rows = await db.query.nodes.findMany({
@@ -112,6 +120,67 @@ nodesRouter.post("/:id/reset", async (c) => {
   }
 
   return c.json({ nodeId: id, sshTriggered, sshError, manualCmd });
+});
+
+// ── GET /admin/nodes/:id/agent-info ───────────────────────────────────────────
+// Proxy al /health del agente — devuelve la versión instalada y la objetivo
+// (la que sirve el control plane) para saber si hay actualización disponible.
+nodesRouter.get("/:id/agent-info", async (c) => {
+  const db   = createDb(c.env.DB);
+  const node = await db.query.nodes.findFirst({ where: eq(nodes.id, c.req.param("id")) });
+  if (!node) return c.json({ error: "not found" }, 404);
+
+  const targetVersion = agentTargetVersion(c.env.AGENT_BINARY_URL);
+
+  let installedVersion: string | null = null;
+  let reachable = false;
+  try {
+    const res = await fetch(`${node.agentUrl}/health`, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      reachable = true;
+      installedVersion = ((await res.json()) as { version?: string }).version ?? null;
+    }
+  } catch {
+    // agente inalcanzable — se reporta reachable=false
+  }
+
+  return c.json({
+    reachable,
+    installedVersion,
+    targetVersion,
+    updateAvailable: reachable && installedVersion !== null && installedVersion !== targetVersion,
+  });
+});
+
+// ── POST /admin/nodes/:id/update-agent ────────────────────────────────────────
+// Ordena al agente que se auto-actualice descargando el binario objetivo.
+nodesRouter.post("/:id/update-agent", async (c) => {
+  const db   = createDb(c.env.DB);
+  const node = await db.query.nodes.findFirst({ where: eq(nodes.id, c.req.param("id")) });
+  if (!node) return c.json({ error: "not found" }, 404);
+  if (!node.agentToken) return c.json({ error: "El node no tiene token de agente — reinstálalo" }, 409);
+
+  let res: Response;
+  try {
+    res = await fetch(`${node.agentUrl}/update`, {
+      method:  "POST",
+      headers: { "X-Agent-Token": node.agentToken, "Content-Type": "application/json" },
+      body:    JSON.stringify({ base_url: c.env.AGENT_BINARY_URL }),
+      signal:  AbortSignal.timeout(30000),
+    });
+  } catch (err) {
+    return c.json({ error: `No se pudo contactar al agente: ${err instanceof Error ? err.message : err}` }, 502);
+  }
+
+  if (!res.ok) {
+    return c.json({ error: `El agente rechazó la actualización (${res.status}): ${(await res.text()).slice(0, 300)}` }, 502);
+  }
+
+  return c.json({
+    ok:            true,
+    targetVersion: agentTargetVersion(c.env.AGENT_BINARY_URL),
+    detail:        await res.json().catch(() => null),
+  });
 });
 
 nodesRouter.delete("/:id", async (c) => {
