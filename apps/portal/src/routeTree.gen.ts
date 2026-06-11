@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
@@ -16,6 +17,11 @@ import { Route as AuthedFilesIndexRouteImport } from './routes/_authed/files/ind
 import { Route as AuthedDomainsIndexRouteImport } from './routes/_authed/domains/index'
 import { Route as AuthedDatabasesIndexRouteImport } from './routes/_authed/databases/index'
 
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -49,12 +55,14 @@ const AuthedDatabasesIndexRoute = AuthedDatabasesIndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/databases/': typeof AuthedDatabasesIndexRoute
   '/domains/': typeof AuthedDomainsIndexRoute
   '/files/': typeof AuthedFilesIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/': typeof AuthedIndexRoute
   '/databases': typeof AuthedDatabasesIndexRoute
   '/domains': typeof AuthedDomainsIndexRoute
@@ -64,6 +72,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/databases/': typeof AuthedDatabasesIndexRoute
   '/_authed/domains/': typeof AuthedDomainsIndexRoute
@@ -71,13 +80,20 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/databases/' | '/domains/' | '/files/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/databases/'
+    | '/domains/'
+    | '/files/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/' | '/databases' | '/domains' | '/files'
+  to: '/login' | '/register' | '/' | '/databases' | '/domains' | '/files'
   id:
     | '__root__'
     | '/_authed'
     | '/login'
+    | '/register'
     | '/_authed/'
     | '/_authed/databases/'
     | '/_authed/domains/'
@@ -87,10 +103,18 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  RegisterRoute: typeof RegisterRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -156,6 +180,7 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

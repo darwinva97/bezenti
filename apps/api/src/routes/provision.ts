@@ -195,12 +195,46 @@ chmod +x "$AGENT_BIN.new"
 mv -f "$AGENT_BIN.new" "$AGENT_BIN"
 log "✓ Agente descargado"
 
+# ─── 6.5 Cloudflare Tunnel ──────────────────────────────────────────────────
+# Un Cloudflare Worker no puede hacer fetch a una IP cruda (error 1003), así
+# que el agente se expone vía un quick tunnel de cloudflared. El agente
+# descubre la URL pública por el endpoint de métricas y la reporta en cada
+# heartbeat, de modo que la BD sigue al tunnel aunque su URL cambie.
+log "Instalando Cloudflare Tunnel..."
+CF_BIN="/usr/local/bin/cloudflared"
+case $ARCH_TAG in
+  amd64) CF_ARCH="amd64" ;;
+  arm64) CF_ARCH="arm64" ;;
+esac
+if [[ ! -x "$CF_BIN" ]]; then
+  curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$CF_ARCH" -o "$CF_BIN" \\
+    || err "No se pudo descargar cloudflared"
+  chmod +x "$CF_BIN"
+fi
+cat > /etc/systemd/system/cf-tunnel.service << CFSVC
+[Unit]
+Description=Cloudflare Tunnel (Bezenti agent)
+After=network.target bezenti-agent.service
+
+[Service]
+ExecStart=$CF_BIN tunnel --no-autoupdate --metrics localhost:9091 --url http://localhost:$AGENT_PORT
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+CFSVC
+systemctl daemon-reload
+systemctl enable cf-tunnel
+systemctl restart cf-tunnel
+log "✓ Cloudflare Tunnel activo"
+
 # ─── 7. Servicio systemd ────────────────────────────────────────────────────
 log "Configurando systemd..."
 cat > /etc/systemd/system/bezenti-agent.service << SYSD
 [Unit]
 Description=Bezenti Node Agent
-After=network.target unit.service mariadb.service
+After=network.target unit.service mariadb.service cf-tunnel.service
 Wants=unit.service mariadb.service
 
 [Service]
@@ -208,6 +242,7 @@ Environment=AGENT_TOKEN=$AGENT_TOKEN
 Environment=NODE_ID=$NODE_ID
 Environment=CONTROL_PLANE_URL=$API_URL
 Environment=AGENT_PORT=$AGENT_PORT
+Environment=CF_METRICS_ADDR=localhost:9091
 ExecStart=$AGENT_BIN
 Restart=always
 RestartSec=5

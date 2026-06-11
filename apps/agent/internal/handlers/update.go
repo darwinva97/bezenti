@@ -13,7 +13,7 @@ import (
 
 // Version del agente. Se incrementa en cada release y se compara contra la
 // versión objetivo del control plane para saber si hay actualización.
-const Version = "0.2.1"
+const Version = "0.2.2"
 
 // Update descarga un binario nuevo y reinicia el servicio para aplicarlo.
 // Lo invoca el control plane (token-authed) cuando hay una versión nueva.

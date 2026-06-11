@@ -92,7 +92,8 @@ func heartbeatLoop(controlPlaneURL, nodeID, token string) {
 }
 
 type heartbeatBody struct {
-	NodeID       string `json:"nodeId"`
+	NodeID       string  `json:"nodeId"`
+	AgentURL     string  `json:"agentUrl,omitempty"`
 	CpuPct       float64 `json:"cpuPct"`
 	RamUsedMb    int     `json:"ramUsedMb"`
 	DiskUsedGb   float64 `json:"diskUsedGb"`
@@ -103,6 +104,7 @@ type heartbeatBody struct {
 func sendHeartbeat(controlPlaneURL, nodeID, token string) {
 	body := heartbeatBody{
 		NodeID:       nodeID,
+		AgentURL:     discoverTunnelURL(),
 		CpuPct:       cpuPercent(),
 		RamUsedMb:    ramUsedMb(),
 		DiskUsedGb:   diskUsedGb("/"),
@@ -136,6 +138,30 @@ func sendHeartbeat(controlPlaneURL, nodeID, token string) {
 		return
 	}
 	slog.Debug("heartbeat sent", "status", resp.StatusCode)
+}
+
+// discoverTunnelURL consulta el endpoint de métricas de cloudflared para
+// obtener el hostname público del quick tunnel y lo reporta al control plane.
+// Así el agentUrl en la BD sigue al tunnel aunque su URL cambie tras reinicios.
+// Devuelve "" si no hay tunnel (el control plane conserva el agentUrl anterior).
+func discoverTunnelURL() string {
+	addr := os.Getenv("CF_METRICS_ADDR")
+	if addr == "" {
+		addr = "localhost:9091"
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://" + addr + "/quicktunnel")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	var d struct {
+		Hostname string `json:"hostname"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&d); err != nil || d.Hostname == "" {
+		return ""
+	}
+	return "https://" + d.Hostname
 }
 
 // ── Métricas del sistema ──────────────────────────────────────────────────────

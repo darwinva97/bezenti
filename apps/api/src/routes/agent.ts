@@ -43,6 +43,7 @@ agentRouter.post("/heartbeat", async (c) => {
   const tokenHash = await sha256(c.req.header("X-Agent-Token") ?? "");
   const body      = await c.req.json<{
     nodeId:       string;
+    agentUrl?:    string;
     cpuPct:       number;
     ramUsedMb:    number;
     diskUsedGb:   number;
@@ -64,8 +65,14 @@ agentRouter.post("/heartbeat", async (c) => {
 
   const now = new Date();
 
-  // Actualizar último heartbeat del node
-  await db.update(nodes).set({ lastHeartbeatAt: now, status: "ready" }).where(eq(nodes.id, body.nodeId));
+  // Actualizar último heartbeat del node. El agente reporta su URL pública
+  // de tunnel (cloudflared); la persistimos para que el control plane pueda
+  // alcanzarlo aunque la URL del quick tunnel cambie tras un reinicio.
+  await db.update(nodes).set({
+    lastHeartbeatAt: now,
+    status:          "ready",
+    ...(body.agentUrl && body.agentUrl !== node.agentUrl ? { agentUrl: body.agentUrl } : {}),
+  }).where(eq(nodes.id, body.nodeId));
 
   // Guardar métricas del node
   await db.insert(nodeMetrics).values({
