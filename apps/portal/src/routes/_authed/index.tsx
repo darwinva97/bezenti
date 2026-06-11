@@ -80,6 +80,7 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
     { label: "Proyectos",       to: "/projects" },
     { label: "Dominios",        to: "/domains" },
     { label: "Bases de datos",  to: "/databases" },
+    { label: "Correos",         to: "/email" },
     { label: "Archivos",        to: "/files" },
   ];
 

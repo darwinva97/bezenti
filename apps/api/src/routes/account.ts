@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { createDb, projects, clients } from "@bezenti/db";
+import { createDb, projects, clients, emailAccounts } from "@bezenti/db";
 import { eq } from "drizzle-orm";
 import type { Env } from "../env";
 import { isValidSlug, fitsDnsLabel, computeProjectHost } from "../lib/slug";
@@ -46,6 +46,13 @@ accountRouter.patch("/slug", async (c) => {
 
   const inUse = await db.query.clients.findFirst({ where: eq(clients.accountSlug, newSlug) });
   if (inUse) return c.json({ error: `El slug "${newSlug}" ya está en uso` }, 409);
+
+  // Los buzones de correo viven en <slug>.<EMAIL_DOMAIN> — renombrar el slug
+  // les cambiaría la dirección. Bloquear mientras existan buzones.
+  const mailboxes = await db.query.emailAccounts.findMany({ where: eq(emailAccounts.clientId, client.id) });
+  if (mailboxes.length > 0) {
+    return c.json({ error: "No puedes cambiar el slug mientras tengas buzones de correo — elimínalos primero" }, 409);
+  }
 
   const rows = await db.query.projects.findMany({ where: eq(projects.clientId, client.id) });
   const bezentiProjects = rows.filter((p) => p.subdomain);

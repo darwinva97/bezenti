@@ -35,6 +35,12 @@
     "PAGES_DOMAIN":     "pages.bezenti.com",
     // Wildcard *.db.bezenti.com → node; el host de DB del cliente es
     // <user.id>.db.bezenti.com (alias DNS; el control de acceso es MySQL)
-    "DB_DOMAIN":        "db.bezenti.com"
+    "DB_DOMAIN":        "db.bezenti.com",
+    // Correos corporativos: buzones en <accountSlug>.<EMAIL_DOMAIN>, servidos
+    // por Stalwart en MAIL_HOST. MX/SPF por cuenta se crean vía CF_DNS_TOKEN
+    // (secret) sobre CF_ZONE_ID.
+    "EMAIL_DOMAIN":     "bezenti.com",
+    "MAIL_HOST":        "mail.bezenti.com",
+    "CF_ZONE_ID":       "a8b5a5e1026f202add1fbf8aac824170"
   }
 }

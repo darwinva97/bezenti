@@ -5,9 +5,16 @@ export type Env = {
   BETTER_AUTH_URL:   string;   // URL pública del Worker, ej: https://api.bezenti.com
   BETTER_AUTH_SECRET: string;  // secret aleatorio — wrangler secret put BETTER_AUTH_SECRET
   TRUSTED_ORIGINS:   string;   // CSV: "https://panel.bezenti.com,http://localhost:3001"
-  // Stalwart Mail Server
+  // Stalwart Mail Server (v0.16, API JMAP en POST /jmap)
   STALWART_URL:      string;   // ej: https://mail.bezenti.com
-  STALWART_TOKEN:    string;   // API token de Stalwart admin
+  STALWART_TOKEN:    string;   // "usuario:contraseña" (Basic) o API key (Bearer)
+  // Correos corporativos: el dominio de buzones de un cliente es
+  // <accountSlug>.<EMAIL_DOMAIN>; MAIL_HOST es el MX/IMAP/SMTP.
+  EMAIL_DOMAIN:      string;   // ej: "bezenti.com"
+  MAIL_HOST:         string;   // ej: "mail.bezenti.com"
+  // Cloudflare: creación automática del MX/SPF por cuenta
+  CF_DNS_TOKEN:      string;   // secret — token con Zone DNS:Edit
+  CF_ZONE_ID:        string;   // zona de EMAIL_DOMAIN
   // URL base donde están los binarios del agente para descarga
   // ej: https://releases.bezenti.com o URL de Cloudflare R2 pública
   AGENT_BINARY_URL:  string;
