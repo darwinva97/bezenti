@@ -7,9 +7,9 @@ export const Route = createFileRoute("/_authed/")({
 });
 
 const stats = [
-  { label: "Nodes activos", value: "0", href: "/_authed/nodes/" },
-  { label: "Clientes", value: "0", href: "/_authed/clients/" },
-  { label: "Planes", value: "0", href: "/_authed/plans/" },
+  { label: "Nodes activos", value: "0", href: "/nodes" },
+  { label: "Clientes", value: "0", href: "/clients" },
+  { label: "Planes", value: "0", href: "/plans" },
   { label: "Dominios", value: "0", href: "#" },
 ];
 
@@ -43,10 +43,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const nav = [
-    { label: "Dashboard", to: "/_authed/" },
-    { label: "Nodes",     to: "/_authed/nodes/" },
-    { label: "Clientes",  to: "/_authed/clients/" },
-    { label: "Planes",    to: "/_authed/plans/" },
+    { label: "Dashboard", to: "/" },
+    { label: "Nodes",     to: "/nodes" },
+    { label: "Clientes",  to: "/clients" },
+    { label: "Planes",    to: "/plans" },
   ];
 
   async function handleSignOut() {

@@ -29,7 +29,7 @@ function LoginPage() {
       setError("Acceso restringido a administradores");
       return;
     }
-    navigate({ to: "/_authed/" });
+    navigate({ to: "/" });
   }
 
   return (

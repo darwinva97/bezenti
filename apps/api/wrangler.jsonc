@@ -6,6 +6,12 @@
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
 
+  // api.bezenti.com es same-site con panel/admin.bezenti.com — necesario
+  // para que la cookie de sesión de better-auth persista en el navegador.
+  "routes": [
+    { "pattern": "api.bezenti.com", "custom_domain": true }
+  ],
+
   "d1_databases": [
     {
       "binding": "DB",

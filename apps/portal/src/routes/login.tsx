@@ -23,7 +23,7 @@ function LoginPage() {
       setError(err?.message ?? "Credenciales inválidas");
       return;
     }
-    navigate({ to: "/_authed/" });
+    navigate({ to: "/" });
   }
 
   return (

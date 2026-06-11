@@ -76,10 +76,10 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const nav = [
-    { label: "Mi hosting",      to: "/_authed/" },
-    { label: "Dominios",        to: "/_authed/domains/" },
-    { label: "Bases de datos",  to: "/_authed/databases/" },
-    { label: "Archivos",        to: "/_authed/files/" },
+    { label: "Mi hosting",      to: "/" },
+    { label: "Dominios",        to: "/domains" },
+    { label: "Bases de datos",  to: "/databases" },
+    { label: "Archivos",        to: "/files" },
   ];
 
   async function handleSignOut() {
