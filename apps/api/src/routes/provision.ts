@@ -138,7 +138,10 @@ apt-get install -y -q unit unit-php
 apt-get install -y -q php8.3-cli php8.3-mysql php8.3-curl php8.3-gd \\
   php8.3-mbstring php8.3-xml php8.3-zip php8.3-intl 2>/dev/null || \\
 apt-get install -y -q php-cli php-mysql php-curl php-gd php-mbstring php-xml php-zip
-systemctl enable --now unit
+systemctl enable unit
+# Reiniciar (no solo enable --now): si Unit ya estaba corriendo cuando se
+# instaló unit-php, el módulo PHP no se carga hasta reiniciar el daemon.
+systemctl restart unit
 log "✓ NGINX Unit instalado"
 
 # ─── 3. MariaDB ─────────────────────────────────────────────────────────────
@@ -181,13 +184,15 @@ case $ARCH in
 esac
 AGENT_BIN="/usr/local/bin/bezenti-agent"
 
-if [[ -n "$AGENT_BINARY_URL" ]]; then
-  curl -fsSL "$AGENT_BINARY_URL/bezenti-agent-linux-$ARCH_TAG" -o "$AGENT_BIN" \\
-    || err "No se pudo descargar el agente desde $AGENT_BINARY_URL"
-else
-  err "AGENT_BINARY_URL no configurado — sube el binario y vuelve a intentar"
-fi
-chmod +x "$AGENT_BIN"
+[[ -z "$AGENT_BINARY_URL" ]] && err "AGENT_BINARY_URL no configurado — sube el binario y vuelve a intentar"
+
+# Detener el agente si ya estaba corriendo — no se puede sobrescribir un
+# binario en ejecución (ETXTBSY); descargamos a un temporal y renombramos.
+systemctl stop bezenti-agent 2>/dev/null || true
+curl -fsSL "$AGENT_BINARY_URL/bezenti-agent-linux-$ARCH_TAG" -o "$AGENT_BIN.new" \\
+  || err "No se pudo descargar el agente desde $AGENT_BINARY_URL"
+chmod +x "$AGENT_BIN.new"
+mv -f "$AGENT_BIN.new" "$AGENT_BIN"
 log "✓ Agente descargado"
 
 # ─── 7. Servicio systemd ────────────────────────────────────────────────────

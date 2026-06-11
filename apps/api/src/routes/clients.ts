@@ -151,8 +151,9 @@ clientsRouter.delete("/:id", async (c) => {
     }
   }
 
-  await db.update(clients)
-    .set({ status: "deleted", deletedAt: new Date() })
-    .where(eq(clients.id, c.req.param("id")));
+  // Hard-delete: el userId tiene constraint UNIQUE, así que un soft-delete
+  // bloquearía recrear un cliente para el mismo usuario. Los recursos del VPS
+  // ya se limpiaron arriba; las tablas hijas tienen onDelete cascade.
+  await db.delete(clients).where(eq(clients.id, c.req.param("id")));
   return c.body(null, 204);
 });
