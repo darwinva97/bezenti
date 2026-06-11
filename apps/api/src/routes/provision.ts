@@ -223,11 +223,11 @@ fi
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function bytesToHex(bytes: Uint8Array): string {
+export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function sha256(input: string): Promise<string> {
+export async function sha256(input: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return bytesToHex(new Uint8Array(buf));
 }
