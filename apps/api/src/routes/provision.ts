@@ -162,6 +162,34 @@ if command -v ufw > /dev/null && ufw status | grep -q "Status: active"; then
 fi
 log "✓ MariaDB instalado (acceso externo habilitado)"
 
+# ─── 3b. PowerDNS autoritativo (zonas DNS de clientes) ──────────────────────
+log "Instalando PowerDNS..."
+apt-get install -y -q pdns-server pdns-backend-sqlite3 sqlite3
+PDNS_API_KEY=$(head -c 24 /dev/urandom | xxd -p)
+cat > /etc/powerdns/pdns.d/bezenti.conf << PDNSEOF
+launch=gsqlite3
+gsqlite3-database=/var/lib/powerdns/pdns.sqlite3
+api=yes
+api-key=$PDNS_API_KEY
+webserver=yes
+webserver-address=127.0.0.1
+webserver-port=8081
+local-address=0.0.0.0:53, [::]:53
+default-soa-content=ns1.bezenti.com. hostmaster.@ 0 10800 3600 604800 300
+PDNSEOF
+# El paquete trae launch= vacío en pdns.conf — quitarlo para no duplicar
+grep -v '^launch=' /etc/powerdns/pdns.conf > /tmp/pdns.conf && mv /tmp/pdns.conf /etc/powerdns/pdns.conf
+mkdir -p /var/lib/powerdns
+test -s /var/lib/powerdns/pdns.sqlite3 || sqlite3 /var/lib/powerdns/pdns.sqlite3 < /usr/share/pdns-backend-sqlite3/schema/schema.sqlite3.sql
+chown -R pdns:pdns /var/lib/powerdns
+systemctl enable pdns
+systemctl restart pdns
+if command -v ufw > /dev/null && ufw status | grep -q "Status: active"; then
+  ufw allow 53/udp || true
+  ufw allow 53/tcp || true
+fi
+log "✓ PowerDNS instalado (API local en :8081)"
+
 # ─── 4. SFTP via OpenSSH ────────────────────────────────────────────────────
 log "Configurando SFTP..."
 groupadd -f sftp-clients

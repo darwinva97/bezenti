@@ -7,7 +7,14 @@ export const dnsZones = sqliteTable("dns_zones", {
   id:        text("id").primaryKey(),
   clientId:  text("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   zone:      text("zone").notNull().unique(),  // ej: "midominio.com"
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  // Verificación de propiedad estilo Cloudflare: a cada zona se le asigna un
+  // par del pool *.ns.bezenti.com; la zona se activa solo cuando la
+  // delegación real (NS en el registrador) coincide con el par asignado.
+  ns1:        text("ns1"),
+  ns2:        text("ns2"),
+  status:     text("status", { enum: ["pending", "active"] }).notNull().default("pending"),
+  verifiedAt: integer("verified_at", { mode: "timestamp" }),
+  createdAt:  integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 export const dnsRecords = sqliteTable("dns_records", {

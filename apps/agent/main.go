@@ -70,6 +70,12 @@ func main() {
 			r.Post("/{projectID}/hosts", handlers.SetProjectHosts)
 		})
 
+		// Zonas DNS de clientes (PowerDNS local)
+		r.Route("/dns", func(r chi.Router) {
+			r.Put("/zones/{zone}", handlers.SyncDnsZone)
+			r.Delete("/zones/{zone}", handlers.DeleteDnsZone)
+		})
+
 		// Explorador de archivos del cliente (rutas relativas a /var/www/<user>)
 		r.Route("/files", func(r chi.Router) {
 			r.Get("/list", handlers.FilesList)
