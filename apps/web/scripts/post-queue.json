@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "checklist-seo-para-una-web-nueva",
-      "category": "marketing",
-      "topics": [
-        "seo",
-        "performance"
-      ],
-      "es": "Checklist de SEO para lanzar una web nueva",
-      "en": "An SEO checklist for launching a new website"
-    },
-    {
       "key": "shopify-para-empezar-a-vender",
       "category": "ecommerce",
       "topics": [
@@ -305,6 +295,17 @@
       "es": "Qué es un CRM y cuándo tu negocio lo necesita",
       "en": "What a CRM is and when your business needs one",
       "publishedAt": "2026-06-11"
+    },
+    {
+      "key": "checklist-seo-para-una-web-nueva",
+      "category": "marketing",
+      "topics": [
+        "seo",
+        "performance"
+      ],
+      "es": "Checklist de SEO para lanzar una web nueva",
+      "en": "An SEO checklist for launching a new website",
+      "publishedAt": "2026-06-12"
     }
   ]
 }
