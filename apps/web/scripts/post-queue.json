@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "shopify-para-empezar-a-vender",
-      "category": "ecommerce",
-      "topics": [
-        "shopify",
-        "ecommerce"
-      ],
-      "es": "Shopify para empezar a vender online sin complicarte",
-      "en": "Shopify to start selling online without the hassle"
-    },
-    {
       "key": "bots-de-whatsapp-atencion-cliente",
       "category": "automation",
       "topics": [
@@ -306,6 +296,17 @@
       "es": "Checklist de SEO para lanzar una web nueva",
       "en": "An SEO checklist for launching a new website",
       "publishedAt": "2026-06-12"
+    },
+    {
+      "key": "shopify-para-empezar-a-vender",
+      "category": "ecommerce",
+      "topics": [
+        "shopify",
+        "ecommerce"
+      ],
+      "es": "Shopify para empezar a vender online sin complicarte",
+      "en": "Shopify to start selling online without the hassle",
+      "publishedAt": "2026-06-13"
     }
   ]
 }
