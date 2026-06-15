@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "que-mirar-al-contratar-hosting",
-      "category": "servers",
-      "topics": [
-        "hosting",
-        "performance"
-      ],
-      "es": "Qué mirar antes de contratar un hosting web",
-      "en": "What to check before buying web hosting"
-    },
-    {
       "key": "como-escribir-fichas-de-producto",
       "category": "ecommerce",
       "topics": [
@@ -308,6 +298,17 @@
       "es": "Bots de WhatsApp para atención al cliente que sí ayudan",
       "en": "WhatsApp bots for customer service that actually help",
       "publishedAt": "2026-06-14"
+    },
+    {
+      "key": "que-mirar-al-contratar-hosting",
+      "category": "servers",
+      "topics": [
+        "hosting",
+        "performance"
+      ],
+      "es": "Qué mirar antes de contratar un hosting web",
+      "en": "What to check before buying web hosting",
+      "publishedAt": "2026-06-15"
     }
   ]
 }
