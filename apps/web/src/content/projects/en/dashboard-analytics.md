@@ -12,6 +12,11 @@ description: "A real-time analytics dashboard with interactive charts, key metri
 client: "Dashboard Analytics"
 year: 2026
 featured: true
+# ⚠️ EXAMPLE METRICS — replace with the client's real data.
+results:
+  - { value: "−70%", label: "time on reports" }
+  - { value: "Real time", label: "data" }
+  - { value: "+5", label: "integrated sources" }
 url: https://dashboard-analytics.pages.dev
 ---
 

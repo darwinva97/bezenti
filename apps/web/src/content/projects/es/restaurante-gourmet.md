@@ -12,6 +12,11 @@ description: "Web para restaurante con menú digital interactivo, reservas onlin
 client: "Restaurante Gourmet"
 year: 2026
 featured: true
+# ⚠️ MÉTRICAS DE EJEMPLO — sustituye por datos reales del cliente.
+results:
+  - { value: "+50%", label: "reservas online" }
+  - { value: "×2", label: "pedidos para llevar" }
+  - { value: "Top 3", label: "SEO local" }
 url: https://restaurante-7m6.pages.dev
 ---
 

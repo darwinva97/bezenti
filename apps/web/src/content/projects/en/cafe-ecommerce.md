@@ -12,6 +12,11 @@ description: "An online store for an artisan coffee shop with a product catalog,
 client: "Café Artesanal"
 year: 2026
 featured: true
+# ⚠️ EXAMPLE METRICS — replace with the client's real data.
+results:
+  - { value: "+42%", label: "online sales" }
+  - { value: "×3", label: "monthly orders" }
+  - { value: "1.8 s", label: "load time" }
 url: https://cafe-ecommerce.pages.dev
 ---
 

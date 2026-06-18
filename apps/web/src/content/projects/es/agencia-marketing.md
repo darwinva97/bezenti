@@ -12,6 +12,11 @@ description: "Sitio web completo para agencia de marketing con servicios, portaf
 client: "Agencia Digital"
 year: 2026
 featured: true
+# ⚠️ MÉTRICAS DE EJEMPLO — sustituye por datos reales del cliente.
+results:
+  - { value: "+65%", label: "leads al mes" }
+  - { value: "Top 3", label: "en Google" }
+  - { value: "+120%", label: "tráfico orgánico" }
 url: https://agencia-marketing.pages.dev
 ---
 

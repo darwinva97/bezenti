@@ -12,6 +12,11 @@ description: "An elegant website for a boutique hotel with an immersive gallery,
 client: "Hotel Boutique"
 year: 2026
 featured: true
+# ⚠️ EXAMPLE METRICS — replace with the client's real data.
+results:
+  - { value: "+38%", label: "direct bookings" }
+  - { value: "−45%", label: "OTA commissions" }
+  - { value: "0.9 s", label: "load time" }
 url: https://hotel-boutique.pages.dev
 ---
 

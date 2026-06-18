@@ -12,6 +12,11 @@ description: "Panel de analítica en tiempo real con gráficos interactivos, mé
 client: "Dashboard Analytics"
 year: 2026
 featured: true
+# ⚠️ MÉTRICAS DE EJEMPLO — sustituye por datos reales del cliente.
+results:
+  - { value: "−70%", label: "tiempo en informes" }
+  - { value: "Tiempo real", label: "de los datos" }
+  - { value: "+5", label: "fuentes integradas" }
 url: https://dashboard-analytics.pages.dev
 ---
 

@@ -12,6 +12,11 @@ description: "A restaurant website with an interactive digital menu, online rese
 client: "Restaurante Gourmet"
 year: 2026
 featured: true
+# ⚠️ EXAMPLE METRICS — replace with the client's real data.
+results:
+  - { value: "+50%", label: "online bookings" }
+  - { value: "×2", label: "takeaway orders" }
+  - { value: "Top 3", label: "local SEO" }
 url: https://restaurante-7m6.pages.dev
 ---
 

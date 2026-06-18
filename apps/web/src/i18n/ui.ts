@@ -68,8 +68,35 @@ export const ui = {
     "contact.officesSubtitle":
       "Operamos desde varios países de habla hispana, cerca de ti y de tu horario.",
     "contact.writeUs": "Escríbenos",
+    "contact.methods.title": "Contáctanos directamente",
+    "contact.methods.subtitle":
+      "¿Prefieres algo más rápido que un formulario? Escríbenos por WhatsApp o correo.",
+    "contact.methods.whatsapp": "WhatsApp",
+    "contact.methods.whatsappBody": "Respuesta rápida en horario laboral",
+    "contact.methods.email": "Correo",
+    "contact.faq.title": "Preguntas frecuentes",
+    "contact.faq.subtitle": "Lo que más nos preguntan antes de empezar.",
+
+    "home.stats.projects": "proyectos entregados",
+    "home.stats.countries": "países",
+    "home.stats.reply": "respuesta",
+    "home.stats.replyValue": "24 h",
+    "home.stats.languages": "idiomas",
+    "home.stats.languagesValue": "ES · EN",
+    "home.testimonials.title": "Lo que dicen nuestros clientes",
+    "home.testimonials.subtitle":
+      "Negocios reales que confiaron en nosotros para crecer online.",
+    "home.packages.title": "Planes y precios",
+    "home.packages.subtitle":
+      "Precios claros para empezar, sin sorpresas. Cada proyecto se ajusta a tu negocio.",
+    "home.packages.from": "Desde",
+    "home.packages.popular": "Más elegido",
+    "home.packages.cta": "Pedir presupuesto",
+    "home.packages.note":
+      "Precios orientativos en USD. El presupuesto final depende del alcance; te lo cerramos sin compromiso en 24 h.",
 
     "cta.discuss": "Empezar un proyecto",
+    "cta.freeQuote": "Pide presupuesto gratis",
     "footer.rights": "Todos los derechos reservados.",
     "footer.blurb":
       "Agencia digital de principio a fin: diseño, desarrollo, hosting, correo, SEO, marketing y automatizaciones. Un solo equipo.",
@@ -164,8 +191,35 @@ export const ui = {
     "contact.officesSubtitle":
       "We operate from several Spanish-speaking countries — close to you and your time zone.",
     "contact.writeUs": "Write to us",
+    "contact.methods.title": "Reach us directly",
+    "contact.methods.subtitle":
+      "Prefer something faster than a form? Message us on WhatsApp or email.",
+    "contact.methods.whatsapp": "WhatsApp",
+    "contact.methods.whatsappBody": "Quick reply during business hours",
+    "contact.methods.email": "Email",
+    "contact.faq.title": "Frequently asked questions",
+    "contact.faq.subtitle": "What clients ask us most before starting.",
+
+    "home.stats.projects": "projects delivered",
+    "home.stats.countries": "countries",
+    "home.stats.reply": "reply",
+    "home.stats.replyValue": "24 h",
+    "home.stats.languages": "languages",
+    "home.stats.languagesValue": "ES · EN",
+    "home.testimonials.title": "What our clients say",
+    "home.testimonials.subtitle":
+      "Real businesses that trusted us to grow online.",
+    "home.packages.title": "Plans & pricing",
+    "home.packages.subtitle":
+      "Clear starting prices, no surprises. Every project is tailored to your business.",
+    "home.packages.from": "From",
+    "home.packages.popular": "Most chosen",
+    "home.packages.cta": "Get a quote",
+    "home.packages.note":
+      "Indicative prices in USD. The final quote depends on scope; we close it with no obligation within 24 h.",
 
     "cta.discuss": "Start a project",
+    "cta.freeQuote": "Get a free quote",
     "footer.rights": "All rights reserved.",
     "footer.blurb":
       "End-to-end digital agency: design, development, hosting, email, SEO, marketing and automations. One team.",

@@ -12,6 +12,11 @@ description: "Tienda online para cafetería artesanal con catálogo de productos
 client: "Café Artesanal"
 year: 2026
 featured: true
+# ⚠️ MÉTRICAS DE EJEMPLO — sustituye por datos reales del cliente.
+results:
+  - { value: "+42%", label: "ventas online" }
+  - { value: "×3", label: "pedidos al mes" }
+  - { value: "1.8 s", label: "tiempo de carga" }
 url: https://cafe-ecommerce.pages.dev
 ---
 

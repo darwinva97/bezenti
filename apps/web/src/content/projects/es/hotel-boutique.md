@@ -12,6 +12,11 @@ description: "Sitio web elegante para hotel boutique con galería inmersiva, sis
 client: "Hotel Boutique"
 year: 2026
 featured: true
+# ⚠️ MÉTRICAS DE EJEMPLO — sustituye por datos reales del cliente.
+results:
+  - { value: "+38%", label: "reservas directas" }
+  - { value: "−45%", label: "comisiones a portales" }
+  - { value: "0.9 s", label: "tiempo de carga" }
 url: https://hotel-boutique.pages.dev
 ---
 

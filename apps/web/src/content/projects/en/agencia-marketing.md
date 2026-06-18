@@ -12,6 +12,11 @@ description: "A full website for a marketing agency with services, portfolio, te
 client: "Agencia Digital"
 year: 2026
 featured: true
+# ⚠️ EXAMPLE METRICS — replace with the client's real data.
+results:
+  - { value: "+65%", label: "leads / month" }
+  - { value: "Top 3", label: "on Google" }
+  - { value: "+120%", label: "organic traffic" }
 url: https://agencia-marketing.pages.dev
 ---
 

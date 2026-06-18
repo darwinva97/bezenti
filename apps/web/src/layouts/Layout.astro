@@ -3,6 +3,7 @@ import "../styles/global.css";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
+import WhatsAppFab from "../components/WhatsAppFab.astro";
 import { defaultLocale, type Locale } from "../i18n/config";
 import type { RouteKey } from "../i18n/routes";
 
@@ -160,6 +161,7 @@ const altLocales = alternates.map((a) => a.locale).filter((l) => l !== locale);
             <slot />
         </main>
         <Footer locale={locale} />
+        <WhatsAppFab locale={locale} />
 
         {
             /*

@@ -82,6 +82,13 @@ const projects = defineCollection({
     /** Servicios aplicados (keys de la colección services), para enlazar. */
     services: z.array(z.string()).default([]),
     featured: z.boolean().default(false),
+    /**
+     * Resultados medibles del caso (lo que de verdad vende una agencia). Cada
+     * uno: una cifra protagonista (`value`, p. ej. "+38%") y qué mide (`label`).
+     */
+    results: z
+      .array(z.object({ value: z.string(), label: z.string() }))
+      .default([]),
     /** Galería del caso: cada imagen con alt y pie opcional. */
     gallery: z.array(galleryImage).default([]),
   }),
