@@ -365,7 +365,7 @@ const readLabel = locale === "es" ? "Leer artículo" : "Read article";
             </h2>
             <a
                 href={getPath(locale, "services")}
-                class="group inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700"
+                class="group inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-800"
             >
                 {t("home.services.cta")}
                 <span
@@ -455,6 +455,8 @@ const readLabel = locale === "es" ? "Leer artículo" : "Read article";
             </div>
             <img
                 src="/images/agency.jpg"
+                srcset="/images/agency-480.jpg 480w, /images/agency-800.jpg 800w, /images/agency.jpg 1200w"
+                sizes="(min-width: 1024px) 580px, 92vw"
                 alt={t("home.intro.title")}
                 width="1200"
                 height="900"
@@ -626,7 +628,7 @@ const readLabel = locale === "es" ? "Leer artículo" : "Read article";
             </h2>
             <a
                 href={getPath(locale, "portfolio")}
-                class="group inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700"
+                class="group inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-800"
             >
                 {t("home.portfolio.cta")}
                 <span
@@ -668,7 +670,7 @@ const readLabel = locale === "es" ? "Leer artículo" : "Read article";
                         <p class="mt-3 text-slate-600">
                             {featuredProject.data.description}
                         </p>
-                        <span class="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600">
+                        <span class="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-brand-700">
                             {categoryName(
                                 locale,
                                 featuredProject.data
@@ -848,7 +850,7 @@ const readLabel = locale === "es" ? "Leer artículo" : "Read article";
                     </h2>
                     <a
                         href={getPath(locale, "blog")}
-                        class="group inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700"
+                        class="group inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-800"
                     >
                         {t("home.blog.cta")}
                         <span
