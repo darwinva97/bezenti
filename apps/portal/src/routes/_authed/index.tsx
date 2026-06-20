@@ -1,48 +1,160 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { authClient } from "../../lib/auth";
+import { apiFetch } from "../../lib/api";
 
 export const Route = createFileRoute("/_authed/")({
   component: PortalDashboard,
 });
 
+type Usage = {
+  recordedAt: number | null;
+  plan: { id: string; name: string; diskMb: number } | null;
+  disk: {
+    usedMb: number;
+    totalMb: number | null;
+    breakdown: { filesMb: number; mysqlMb: number; pgMb: number; emailMb: number };
+  };
+  web: { used: number; max: number | null };
+  databases: { used: number; max: number | null };
+  email: { used: number; max: number | null; usedMb: number };
+  processes: { used: number; max: number | null };
+};
+
+type Account = {
+  accountSlug: string | null;
+  dbHost: string | null;
+  sftpHost: string | null;
+  sftpUser: string | null;
+  plan: { id: string; name: string } | null;
+};
+
+function fmtSize(mb: number): string {
+  if (mb >= 1024) return `${(mb / 1024).toFixed(mb >= 10240 ? 0 : 1)} GB`;
+  return `${Math.round(mb)} MB`;
+}
+
+function pct(used: number, max: number | null): number {
+  if (!max || max <= 0) return 0;
+  return Math.min(100, Math.round((used / max) * 100));
+}
+
+function barColor(p: number): string {
+  if (p >= 90) return "bg-red-500";
+  if (p >= 75) return "bg-amber-500";
+  return "bg-blue-600";
+}
+
 function PortalDashboard() {
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch<Usage>("/portal/metrics/usage"),
+      apiFetch<Account>("/portal/account").catch(() => null),
+    ])
+      .then(([u, a]) => {
+        setUsage(u);
+        setAccount(a);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "No se pudo cargar tu hosting"))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <PortalLayout>
       <div className="space-y-6">
-        <h1 className="text-xl font-semibold text-gray-900">Mi hosting</h1>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard label="Disco usado" value="— / 2 GB" />
-          <StatCard label="Dominios" value="0 / 1" />
-          <StatCard label="Bases de datos" value="0 / 1" />
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Mi hosting</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {usage?.plan ? `Plan ${usage.plan.name}` : "Resumen de consumo"}
+            {usage?.recordedAt
+              ? ` · actualizado ${new Date(usage.recordedAt).toLocaleString("es-PE")}`
+              : usage && " · aún sin métricas recogidas"}
+          </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <InfoCard title="Acceso SFTP">
-            <InfoRow label="Host" value="—" />
-            <InfoRow label="Puerto" value="22" />
-            <InfoRow label="Usuario" value="—" />
-            <InfoRow label="Directorio" value="/public" />
-          </InfoCard>
+        {loading && <p className="text-sm text-gray-500">Cargando consumo…</p>}
 
-          <InfoCard title="PHP">
-            <InfoRow label="Versión" value="8.3" />
-            <InfoRow label="memory_limit" value="128 MB" />
-            <InfoRow label="upload_max_filesize" value="32 MB" />
-            <InfoRow label="max_execution_time" value="30s" />
-          </InfoCard>
-        </div>
+        {error && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {error}
+          </div>
+        )}
+
+        {usage && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <UsageCard
+                label="Disco usado"
+                used={usage.disk.usedMb}
+                max={usage.disk.totalMb}
+                render={fmtSize}
+                hint={`Archivos ${fmtSize(usage.disk.breakdown.filesMb)} · BD ${fmtSize(
+                  usage.disk.breakdown.mysqlMb + usage.disk.breakdown.pgMb,
+                )} · Correo ${fmtSize(usage.disk.breakdown.emailMb)}`}
+              />
+              <UsageCard label="Webs / proyectos" used={usage.web.used} max={usage.web.max} />
+              <UsageCard label="Bases de datos" used={usage.databases.used} max={usage.databases.max} />
+              <UsageCard
+                label="Cuentas de correo"
+                used={usage.email.used}
+                max={usage.email.max}
+                hint={`${fmtSize(usage.email.usedMb)} usados en buzones`}
+              />
+              <UsageCard label="Procesos PHP" used={usage.processes.used} max={usage.processes.max} />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InfoCard title="Acceso SFTP">
+                <InfoRow label="Host" value={account?.sftpHost ?? "—"} />
+                <InfoRow label="Puerto" value="22" />
+                <InfoRow label="Usuario" value={account?.sftpUser ?? "—"} />
+                <InfoRow label="Directorio" value="/public" />
+              </InfoCard>
+
+              <InfoCard title="Base de datos">
+                <InfoRow label="Host" value={account?.dbHost ?? "—"} />
+                <InfoRow label="Puerto" value="3306" />
+                <InfoRow label="Motor" value="MariaDB / MySQL" />
+                <InfoRow label="Gestión" value="phpMyAdmin" />
+              </InfoCard>
+            </div>
+          </>
+        )}
       </div>
     </PortalLayout>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function UsageCard(props: {
+  label: string;
+  used: number;
+  max: number | null;
+  render?: (n: number) => string;
+  hint?: string;
+}) {
+  const { label, used, max, render = (n) => String(n), hint } = props;
+  const p = pct(used, max);
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-xl font-semibold text-gray-900 mt-1">{value}</p>
+      <div className="flex items-baseline justify-between">
+        <p className="text-sm text-gray-500">{label}</p>
+        {max !== null && <span className="text-xs text-gray-400">{p}%</span>}
+      </div>
+      <p className="text-xl font-semibold text-gray-900 mt-1">
+        {render(used)}
+        {max !== null && <span className="text-base font-normal text-gray-400"> / {render(max)}</span>}
+      </p>
+      {max !== null && (
+        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+          <div className={`h-full rounded-full ${barColor(p)}`} style={{ width: `${p}%` }} />
+        </div>
+      )}
+      {hint && <p className="mt-2 text-xs text-gray-400">{hint}</p>}
     </div>
   );
 }

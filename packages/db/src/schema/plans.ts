@@ -9,6 +9,7 @@ export const plans = sqliteTable("plans", {
   ramMbSoft:          integer("ram_mb_soft").notNull(), // límite soft de RAM (referencia)
   maxDomains:         integer("max_domains").notNull(),
   maxDatabases:       integer("max_databases").notNull(),
+  maxEmailAccounts:   integer("max_email_accounts").notNull().default(5),
   // JSON array de versiones permitidas, ej: '["8.1","8.2","8.3"]'
   phpVersions:        text("php_versions").notNull().default('["8.3"]'),
   phpMemoryLimitMb:   integer("php_memory_limit_mb").notNull().default(128),

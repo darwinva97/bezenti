@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createDb, nodes, nodeMetrics, clientMetrics, clients } from "@bezenti/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../env";
 
 // Rutas llamadas por el node agent (no por el panel)
@@ -48,11 +48,13 @@ agentRouter.post("/heartbeat", async (c) => {
     ramUsedMb:    number;
     diskUsedGb:   number;
     clientsCount: number;
+    // El agente reporta por linuxUser (no conoce el clientId interno).
     clients: Array<{
-      id:            string;
-      diskUsedMb:    number;
-      processCount:  number;
-      requestsToday: number;
+      linuxUser:      string;
+      diskUsedMb:     number;
+      mysqlUsedMb?:   number;
+      processCount:   number;
+      requestsToday?: number;
     }>;
   }>();
 
@@ -84,17 +86,37 @@ agentRouter.post("/heartbeat", async (c) => {
     clientsCount: body.clientsCount,
   });
 
-  // Guardar métricas por cliente
+  // Guardar métricas por cliente. El agente reporta por linuxUser; lo
+  // resolvemos a clientId con una sola consulta y descartamos los que no
+  // correspondan a un cliente de este node (defensa en profundidad).
   if (body.clients?.length) {
-    await db.insert(clientMetrics).values(
-      body.clients.map((cl) => ({
-        clientId:      cl.id,
-        recordedAt:    now,
-        diskUsedMb:    cl.diskUsedMb,
-        processCount:  cl.processCount,
-        requestsToday: cl.requestsToday,
-      })),
+    const linuxUsers = body.clients.map((cl) => cl.linuxUser).filter(Boolean);
+    const rows = linuxUsers.length
+      ? await db.query.clients.findMany({
+          where:   inArray(clients.linuxUser, linuxUsers),
+          columns: { id: true, linuxUser: true, nodeId: true },
+        })
+      : [];
+    const idByUser = new Map(
+      rows.filter((r) => r.nodeId === body.nodeId).map((r) => [r.linuxUser, r.id]),
     );
+
+    const metricRows = body.clients
+      .map((cl) => {
+        const clientId = idByUser.get(cl.linuxUser);
+        if (!clientId) return null;
+        return {
+          clientId,
+          recordedAt:    now,
+          diskUsedMb:    cl.diskUsedMb,
+          mysqlUsedMb:   cl.mysqlUsedMb ?? 0,
+          processCount:  cl.processCount,
+          requestsToday: cl.requestsToday ?? 0,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    if (metricRows.length) await db.insert(clientMetrics).values(metricRows);
   }
 
   return c.json({ ok: true });

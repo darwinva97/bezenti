@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 
 	"bezenti/agent/internal/handlers"
 	agentmw "bezenti/agent/internal/middleware"
+	"bezenti/agent/internal/services"
 )
 
 func main() {
@@ -117,25 +119,34 @@ func heartbeatLoop(controlPlaneURL, nodeID, token string) {
 	}
 }
 
+type clientStat struct {
+	// Usuario Linux del cliente (cli_xxxx). El control plane lo mapea a clientId.
+	LinuxUser    string `json:"linuxUser"`
+	DiskUsedMb   int    `json:"diskUsedMb"`
+	MysqlUsedMb  int    `json:"mysqlUsedMb"`
+	ProcessCount int    `json:"processCount"`
+}
+
 type heartbeatBody struct {
-	NodeID       string  `json:"nodeId"`
-	AgentURL     string  `json:"agentUrl,omitempty"`
-	CpuPct       float64 `json:"cpuPct"`
-	RamUsedMb    int     `json:"ramUsedMb"`
-	DiskUsedGb   float64 `json:"diskUsedGb"`
-	ClientsCount int     `json:"clientsCount"`
-	Clients      []any   `json:"clients"`
+	NodeID       string       `json:"nodeId"`
+	AgentURL     string       `json:"agentUrl,omitempty"`
+	CpuPct       float64      `json:"cpuPct"`
+	RamUsedMb    int          `json:"ramUsedMb"`
+	DiskUsedGb   float64      `json:"diskUsedGb"`
+	ClientsCount int          `json:"clientsCount"`
+	Clients      []clientStat `json:"clients"`
 }
 
 func sendHeartbeat(controlPlaneURL, nodeID, token string) {
+	clients := gatherClientStats()
 	body := heartbeatBody{
 		NodeID:       nodeID,
 		AgentURL:     discoverTunnelURL(),
 		CpuPct:       cpuPercent(),
 		RamUsedMb:    ramUsedMb(),
 		DiskUsedGb:   diskUsedGb("/"),
-		ClientsCount: 0,
-		Clients:      []any{},
+		ClientsCount: len(clients),
+		Clients:      clients,
 	}
 
 	data, err := json.Marshal(body)
@@ -265,6 +276,73 @@ func diskUsedGb(path string) float64 {
 	free := stat.Bfree * uint64(stat.Bsize)
 	used := total - free
 	return float64(used) / 1e9
+}
+
+// ── Métricas por cliente ──────────────────────────────────────────────────────
+
+// gatherClientStats recorre /var/www, y por cada usuario de cliente (cli_*)
+// reporta disco usado (du), uso de MariaDB (information_schema) y procesos
+// activos. El control plane mapea linuxUser → clientId y persiste el registro.
+func gatherClientStats() []clientStat {
+	entries, err := os.ReadDir("/var/www")
+	if err != nil {
+		return []clientStat{}
+	}
+
+	// Una sola consulta a MariaDB para todos los schemas; se reparte por usuario.
+	mysqlBySchema := services.Database{}.UsageMBBySchema()
+
+	stats := make([]clientStat, 0, len(entries))
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		user := e.Name()
+		if !strings.HasPrefix(user, "cli_") {
+			continue
+		}
+		mysqlMb := 0
+		for schema, mb := range mysqlBySchema {
+			// El agente crea BDs como <user>_db y <user>_<n>.
+			if schema == user || strings.HasPrefix(schema, user+"_") {
+				mysqlMb += mb
+			}
+		}
+		stats = append(stats, clientStat{
+			LinuxUser:    user,
+			DiskUsedMb:   duMB("/var/www/" + user),
+			MysqlUsedMb:  mysqlMb,
+			ProcessCount: psCount(user),
+		})
+	}
+	return stats
+}
+
+// duMB retorna el espacio usado (MB) de una ruta vía `du -sm`.
+func duMB(path string) int {
+	out, err := exec.Command("du", "-sm", path).Output()
+	if err != nil {
+		return 0
+	}
+	fields := strings.Fields(string(out))
+	if len(fields) == 0 {
+		return 0
+	}
+	n, _ := strconv.Atoi(fields[0])
+	return n
+}
+
+// psCount cuenta los procesos activos de un usuario.
+func psCount(user string) int {
+	out, err := exec.Command("ps", "-u", user, "--no-headers").Output()
+	if err != nil {
+		return 0
+	}
+	trimmed := strings.TrimSpace(string(out))
+	if trimmed == "" {
+		return 0
+	}
+	return len(strings.Split(trimmed, "\n"))
 }
 
 // Ignorar lint en imports no usados durante la compilación

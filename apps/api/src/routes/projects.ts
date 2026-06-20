@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createDb, projects, clients, plans } from "@bezenti/db";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc, ne } from "drizzle-orm";
 import type { Env } from "../env";
 import { slugify, isValidSlug, fitsDnsLabel, computeProjectHost } from "../lib/slug";
 import { generateAccountSlug } from "./clients";
@@ -92,6 +92,18 @@ projectsRouter.post("/", async (c) => {
   if (taken) return c.json({ error: `El subdominio "${subdomain}" ya está en uso` }, 409);
 
   const plan       = client.plan ?? (await db.query.plans.findFirst({ where: eq(plans.id, client.planId) }));
+
+  // Aplicar el límite de webs del plan (cuenta los proyectos no eliminados).
+  if (plan) {
+    const current = await db.query.projects.findMany({
+      where:   and(eq(projects.clientId, client.id), ne(projects.status, "deleted")),
+      columns: { id: true },
+    });
+    if (current.length >= plan.maxDomains) {
+      return c.json({ error: `Alcanzaste el límite de ${plan.maxDomains} webs de tu plan` }, 422);
+    }
+  }
+
   const phpVersion = plan ? ((JSON.parse(plan.phpVersions) as string[])[0] ?? "8.3") : "8.3";
   const id         = crypto.randomUUID();
   const docPath    = subdomain;

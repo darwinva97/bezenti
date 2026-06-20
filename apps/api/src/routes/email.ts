@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createDb, emailAccounts } from "@bezenti/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import type { Env } from "../env";
 import { getClient, ensureAccountSlug } from "./projects";
 
@@ -182,6 +182,17 @@ emailRouter.post("/", async (c) => {
   const client = await getClient(db, user.id);
   if (!client) return c.json({ error: "no hosting found" }, 404);
   if (client.status !== "active") return c.json({ error: "Tu hosting está suspendido" }, 403);
+
+  // Aplicar el límite de cuentas de correo del plan.
+  if (client.plan) {
+    const current = await db.query.emailAccounts.findMany({
+      where:   and(eq(emailAccounts.clientId, client.id), ne(emailAccounts.status, "deleted")),
+      columns: { id: true },
+    });
+    if (current.length >= client.plan.maxEmailAccounts) {
+      return c.json({ error: `Alcanzaste el límite de ${client.plan.maxEmailAccounts} correos de tu plan` }, 422);
+    }
+  }
 
   const slug   = await ensureAccountSlug(db, client, user.name || (user.email.split("@")[0] ?? user.email));
   const domain = emailDomainFor(slug, c.env);

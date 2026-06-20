@@ -24,7 +24,7 @@ plansRouter.post("/", async (c) => {
   const body = await c.req.json<{
     name: string; pricePen: number; priceUsd?: number;
     diskMb: number; ramMbSoft: number;
-    maxDomains: number; maxDatabases: number;
+    maxDomains: number; maxDatabases: number; maxEmailAccounts?: number;
     phpVersions?: string; phpMemoryLimitMb?: number;
     phpMaxProcesses?: number; bandwidthGbMonth?: number;
   }>();
@@ -41,6 +41,7 @@ plansRouter.post("/", async (c) => {
     ramMbSoft:         body.ramMbSoft,
     maxDomains:        body.maxDomains,
     maxDatabases:      body.maxDatabases,
+    maxEmailAccounts:  body.maxEmailAccounts ?? 5,
     phpVersions:       body.phpVersions ?? '["8.3"]',
     phpMemoryLimitMb:  body.phpMemoryLimitMb ?? 128,
     phpMaxProcesses:   body.phpMaxProcesses ?? 5,

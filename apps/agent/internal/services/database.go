@@ -49,6 +49,35 @@ func (Database) CreateDatabase(username string) (DBCreds, error) {
 	return DBCreds{Name: dbName, User: dbUser, Password: password}, nil
 }
 
+// UsageMBBySchema retorna el tamaño en MB de cada schema de MariaDB
+// (data + index). Best-effort: si MariaDB no responde devuelve nil.
+func (Database) UsageMBBySchema() map[string]int {
+	db, err := rootDB()
+	if err != nil {
+		return nil
+	}
+	defer db.Close()
+
+	rows, err := db.Query(
+		"SELECT table_schema, COALESCE(SUM(data_length + index_length), 0) " +
+			"FROM information_schema.tables GROUP BY table_schema",
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	out := map[string]int{}
+	for rows.Next() {
+		var schema string
+		var sizeBytes int64
+		if err := rows.Scan(&schema, &sizeBytes); err == nil {
+			out[schema] = int(sizeBytes / 1024 / 1024)
+		}
+	}
+	return out
+}
+
 func (Database) DeleteDatabase(username string) {
 	db, err := rootDB()
 	if err != nil {
