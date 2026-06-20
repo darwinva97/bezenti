@@ -43,10 +43,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const nav = [
-    { label: "Dashboard", to: "/" },
-    { label: "Nodes",     to: "/nodes" },
-    { label: "Clientes",  to: "/clients" },
-    { label: "Planes",    to: "/plans" },
+    { label: "Dashboard",   to: "/" },
+    { label: "Nodes",       to: "/nodes" },
+    { label: "Proveedores", to: "/providers" },
+    { label: "Clientes",    to: "/clients" },
+    { label: "Planes",      to: "/plans" },
   ];
 
   async function handleSignOut() {

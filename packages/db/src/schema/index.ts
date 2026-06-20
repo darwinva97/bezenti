@@ -1,5 +1,6 @@
 export * from "./auth";
 export * from "./plans";
+export * from "./providers";
 export * from "./nodes";
 export * from "./clients";
 export * from "./projects";

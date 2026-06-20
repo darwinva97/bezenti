@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { createDb, nodes, nodeMetrics } from "@bezenti/db";
+import { createDb, nodes, nodeMetrics, providers } from "@bezenti/db";
 import { eq, desc } from "drizzle-orm";
 import type { Env } from "../env";
 import { sshRun } from "../lib/ssh";
 import { bytesToHex, sha256, AGENT_PORT } from "./provision";
+import { deleteProviderServer } from "./providers";
 
 export const nodesRouter = new Hono<{ Bindings: Env }>();
 
@@ -222,6 +223,25 @@ nodesRouter.delete("/:id", async (c) => {
     );
   }
 
+  // Si lo creó la plataforma vía API, intentar borrar el servidor en el
+  // proveedor (best-effort) para no dejar el VPS facturándose en origen.
+  let providerError: string | null = null;
+  if (node.providerId && node.externalId) {
+    const provider = await db.query.providers.findFirst({ where: eq(providers.id, node.providerId) });
+    if (provider) {
+      try {
+        await deleteProviderServer(provider, node.externalId);
+      } catch (err) {
+        providerError = err instanceof Error ? err.message : String(err);
+      }
+    }
+  }
+
   await db.delete(nodes).where(eq(nodes.id, id));
+  // Avisamos si el borrado en origen falló: el registro se quitó pero el VPS
+  // podría seguir vivo en el proveedor.
+  if (providerError) {
+    return c.json({ ok: true, warning: `El nodo se quitó del panel, pero no se pudo borrar en el proveedor: ${providerError}` });
+  }
   return c.body(null, 204);
 });

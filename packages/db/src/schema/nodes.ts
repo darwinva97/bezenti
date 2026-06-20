@@ -5,6 +5,11 @@ export const nodes = sqliteTable("nodes", {
   id:               text("id").primaryKey(),
   name:             text("name").notNull(),           // nombre amigable, ej: "hetzner-nbg-01"
   provider:         text("provider").notNull(),        // hetzner | digitalocean | vultr | other
+  // Si el nodo lo creó la plataforma vía API de proveedor: cuenta de proveedor
+  // y id del servidor en el proveedor (para apagarlo/borrarlo en origen).
+  // null = nodo agregado manualmente (IP + SSH).
+  providerId:       text("provider_id"),
+  externalId:       text("external_id"),
   region:           text("region"),                    // ej: "eu-central" "nyc3"
   ipPublic:         text("ip_public").notNull(),
   // URL base del node agent, ej: https://agent.bezenti.internal/nbg01
