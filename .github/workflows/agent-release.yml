@@ -38,3 +38,20 @@ jobs:
             apps/agent/bezenti-agent-linux-amd64
             apps/agent/bezenti-agent-linux-arm64
           generate_release_notes: true
+
+      # Los nodos descargan el binario desde R2 (AGENT_BINARY_URL), no desde
+      # GitHub Releases. Subimos a bezenti-releases/agent/<version>/ para que
+      # el release quede listo sin paso manual. La versión es el tag sin el
+      # prefijo "agent-" (agent-v0.3.2 → v0.3.2).
+      - name: Upload binaries to R2
+        env:
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: apps/agent
+        run: |
+          VERSION="${GITHUB_REF_NAME#agent-}"
+          for arch in amd64 arm64; do
+            npx --yes wrangler@4 r2 object put \
+              "bezenti-releases/agent/${VERSION}/bezenti-agent-linux-${arch}" \
+              --file="bezenti-agent-linux-${arch}" --remote
+          done
