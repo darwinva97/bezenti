@@ -21,7 +21,20 @@ type NodeRow = {
   diskGbTotal: number | null;
   ramMbTotal: number | null;
   lastHeartbeatAt: string | null;
+  stale?: boolean;
 };
+
+// Tiempo relativo desde el último heartbeat, ej: "hace 5 min".
+function lastSeen(iso: string | null): string {
+  if (!iso) return "sin señal aún";
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "última señal: hace <1 min";
+  if (min < 60) return `última señal: hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `última señal: hace ${h} h`;
+  return `última señal: hace ${Math.floor(h / 24)} d`;
+}
 
 type ProvisionResult = {
   nodeId: string;
@@ -64,8 +77,12 @@ function NodesPage() {
       method:      "DELETE",
       credentials: "include",
     });
-    if (res.ok) fetchNodes();
-    else alert("No se pudo eliminar el nodo");
+    if (res.ok) {
+      fetchNodes();
+    } else {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      alert(body?.error ?? "No se pudo eliminar el nodo");
+    }
   }
 
   return (
@@ -432,6 +449,9 @@ function NodeTableRow({ node, onReset, onDelete }: {
         <span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>
           {st.label}
         </span>
+        {(node.status === "offline" || node.status === "degraded") && (
+          <p className="mt-1 text-[11px] text-gray-400">{lastSeen(node.lastHeartbeatAt)}</p>
+        )}
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">

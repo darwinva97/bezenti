@@ -15,12 +15,29 @@ function agentTargetVersion(binaryUrl: string | undefined): string | null {
   return seg.replace(/^v/, "") || null;
 }
 
+// El agente manda heartbeat cada 30 s. Si pasan >3 min sin señal, el nodo
+// está caído (apagado, borrado en el proveedor, red rota). Lo derivamos en
+// lectura para no mostrar un VPS muerto como "Listo" — sin job de fondo.
+const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
+
+function withEffectiveStatus<
+  T extends { status: string; lastHeartbeatAt: Date | string | null },
+>(node: T): T & { status: string; stale: boolean } {
+  if (node.status === "ready" || node.status === "degraded") {
+    const last = node.lastHeartbeatAt ? new Date(node.lastHeartbeatAt).getTime() : 0;
+    if (Date.now() - last > HEARTBEAT_STALE_MS) {
+      return { ...node, status: "offline", stale: true };
+    }
+  }
+  return { ...node, stale: false };
+}
+
 nodesRouter.get("/", async (c) => {
   const db   = createDb(c.env.DB);
   const rows = await db.query.nodes.findMany({
     orderBy: desc(nodes.createdAt),
   });
-  return c.json(rows);
+  return c.json(rows.map(withEffectiveStatus));
 });
 
 nodesRouter.get("/:id", async (c) => {
@@ -30,7 +47,7 @@ nodesRouter.get("/:id", async (c) => {
     with:  { clients: true },
   });
   if (!node) return c.json({ error: "not found" }, 404);
-  return c.json(node);
+  return c.json(withEffectiveStatus(node));
 });
 
 nodesRouter.post("/", async (c) => {
@@ -185,6 +202,26 @@ nodesRouter.post("/:id/update-agent", async (c) => {
 
 nodesRouter.delete("/:id", async (c) => {
   const db = createDb(c.env.DB);
-  await db.delete(nodes).where(eq(nodes.id, c.req.param("id")));
+  const id = c.req.param("id");
+
+  const node = await db.query.nodes.findFirst({
+    where: eq(nodes.id, id),
+    with:  { clients: { columns: { id: true } } },
+  });
+  if (!node) return c.json({ error: "not found" }, 404);
+
+  // clients.nodeId tiene FK sin cascade: borrar un nodo con clientes daría un
+  // error de constraint poco claro. Avisamos explícitamente.
+  if (node.clients.length > 0) {
+    return c.json(
+      {
+        error: `Este nodo tiene ${node.clients.length} cliente(s) asignado(s). ` +
+          `Migra o elimina esos clientes antes de borrar el nodo.`,
+      },
+      409,
+    );
+  }
+
+  await db.delete(nodes).where(eq(nodes.id, id));
   return c.body(null, 204);
 });
