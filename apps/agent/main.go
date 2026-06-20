@@ -70,6 +70,8 @@ func main() {
 			r.Post("/", handlers.CreateProject)
 			r.Delete("/{projectID}", handlers.DeleteProject)
 			r.Post("/{projectID}/hosts", handlers.SetProjectHosts)
+			// Instalador 1-clic (WordPress y otras apps PHP)
+			r.Post("/{projectID}/install", handlers.InstallApp)
 		})
 
 		// Zonas DNS de clientes (PowerDNS local)

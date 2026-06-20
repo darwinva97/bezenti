@@ -78,6 +78,44 @@ func (Database) UsageMBBySchema() map[string]int {
 	return out
 }
 
+// CreateNamedDatabase crea una BD y usuario específicos (para el instalador de
+// apps: cada WordPress/app tiene su propia BD). Idempotente.
+func (Database) CreateNamedDatabase(dbName, dbUser, password string) error {
+	db, err := rootDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	stmts := []string{
+		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", dbName),
+		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, password),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s'", dbUser, password),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", dbName, dbUser),
+		"FLUSH PRIVILEGES",
+	}
+	for _, s := range stmts {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("db setup: %w", err)
+		}
+	}
+	return nil
+}
+
+// DropNamedDatabase elimina una BD y su usuario (rollback del instalador).
+func (Database) DropNamedDatabase(dbName, dbUser string) {
+	db, err := rootDB()
+	if err != nil {
+		return
+	}
+	defer db.Close()
+	db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName))
+	db.Exec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", dbUser))
+	db.Exec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", dbUser))
+	db.Exec("FLUSH PRIVILEGES")
+}
+
 func (Database) DeleteDatabase(username string) {
 	db, err := rootDB()
 	if err != nil {

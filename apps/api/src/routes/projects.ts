@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { createDb, projects, clients, plans } from "@bezenti/db";
+import { createDb, projects, clients, plans, clientDatabases } from "@bezenti/db";
 import { and, eq, desc, ne } from "drizzle-orm";
 import type { Env } from "../env";
 import { slugify, isValidSlug, fitsDnsLabel, computeProjectHost } from "../lib/slug";
@@ -133,6 +133,133 @@ projectsRouter.post("/", async (c) => {
   });
 
   return c.json({ id, subdomain, host, docPath }, 201);
+});
+
+// ── Instalador 1-clic (tipo Softaculous) ──────────────────────────────────────
+// Catálogo de apps instalables. Extensible: añade entradas y soporte en el
+// agente (services/installer.go).
+const INSTALLABLE_APPS = ["wordpress"] as const;
+type InstallableApp = (typeof INSTALLABLE_APPS)[number];
+
+projectsRouter.get("/apps/catalog", (c) =>
+  c.json([
+    {
+      id:          "wordpress",
+      name:        "WordPress",
+      description: "El CMS más usado del mundo. Blog, web o tienda con WooCommerce.",
+      needsAdmin:  true,
+    },
+  ]),
+);
+
+function genPassword(len = 20): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(len));
+  const alpha = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  return Array.from(bytes, (b) => alpha[b % alpha.length]).join("");
+}
+
+projectsRouter.post("/:id/install", async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json<{
+    app:           string;
+    title?:        string;
+    adminUser?:    string;
+    adminEmail?:   string;
+    adminPassword?: string;
+    locale?:       string;
+  }>();
+
+  if (!INSTALLABLE_APPS.includes(body.app as InstallableApp)) {
+    return c.json({ error: `App no soportada: ${body.app}` }, 400);
+  }
+
+  const db     = createDb(c.env.DB);
+  const client = await getClient(db, user.id);
+  if (!client) return c.json({ error: "no hosting found" }, 404);
+  if (client.status !== "active") return c.json({ error: "Tu hosting está suspendido" }, 403);
+  if (!client.node) return c.json({ error: "El hosting no tiene node asignado" }, 409);
+
+  const project = await db.query.projects.findFirst({ where: eq(projects.id, c.req.param("id")) });
+  if (!project || project.clientId !== client.id) return c.json({ error: "not found" }, 404);
+  if (project.appType) {
+    return c.json({ error: `Este proyecto ya tiene ${project.appType} instalado` }, 409);
+  }
+
+  // Instalar WordPress crea una BD dedicada → cuenta contra el límite del plan.
+  const plan = client.plan ?? (await db.query.plans.findFirst({ where: eq(plans.id, client.planId) }));
+  if (plan) {
+    const dbs = await db.query.clientDatabases.findMany({
+      where:   eq(clientDatabases.clientId, client.id),
+      columns: { id: true },
+    });
+    if (dbs.length >= plan.maxDatabases) {
+      return c.json({ error: `Instalar ${body.app} necesita una base de datos y alcanzaste el límite de ${plan.maxDatabases} de tu plan` }, 422);
+    }
+  }
+
+  const adminUser     = body.adminUser?.trim() || "admin";
+  const adminEmail    = body.adminEmail?.trim() || user.email;
+  const title         = body.title?.trim() || project.name;
+  const adminPassword = body.adminPassword?.trim() || genPassword();
+
+  const dbId       = crypto.randomUUID();
+  const dbName     = `${client.linuxUser}_${dbId.replace(/-/g, "").slice(0, 6)}`;
+  const dbPassword = genPassword(24);
+  const scheme     = project.sslStatus === "active" ? "https" : "http";
+  const siteUrl    = `${scheme}://${project.domain}`;
+
+  // Llamada dedicada con timeout largo: instalar WordPress puede tardar.
+  let res: Response;
+  try {
+    res = await fetch(`${client.node.agentUrl}/projects/${project.id}/install`, {
+      method:  "POST",
+      headers: { "X-Agent-Token": client.node.agentToken!, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        app:            body.app,
+        linux_user:     client.linuxUser,
+        doc_path:       project.docPath,
+        site_url:       siteUrl,
+        title,
+        admin_user:     adminUser,
+        admin_password: adminPassword,
+        admin_email:    adminEmail,
+        locale:         body.locale ?? "es_ES",
+        db_name:        dbName,
+        db_user:        dbName,
+        db_password:    dbPassword,
+      }),
+      signal: AbortSignal.timeout(120000),
+    });
+  } catch (err) {
+    return c.json({ error: `No se pudo contactar al agente: ${err instanceof Error ? err.message : err}` }, 502);
+  }
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 500);
+    return c.json({ error: `Falló la instalación: ${detail}` }, 502);
+  }
+
+  // Persistir la BD creada y marcar la app del proyecto.
+  await db.insert(clientDatabases).values({
+    id:             dbId,
+    clientId:       client.id,
+    projectId:      project.id,
+    engine:         "mysql",
+    dbName,
+    dbUser:         dbName,
+    dbPasswordHash: dbPassword,
+    createdAt:      new Date(),
+  });
+  await db.update(projects).set({ appType: body.app }).where(eq(projects.id, project.id));
+
+  return c.json({
+    ok:       true,
+    app:      body.app,
+    siteUrl,
+    adminUrl: `${siteUrl}/wp-admin`,
+    adminUser,
+    adminPassword,
+    dbName,
+  }, 201);
 });
 
 // Renombrar el subdominio: recablea listeners en el agente, la app y los

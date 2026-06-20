@@ -13,6 +13,9 @@ export const projects = sqliteTable("projects", {
   // Etiqueta editable <proyecto> del subdominio Bezenti (null si el proyecto usa dominio propio)
   subdomain:   text("subdomain"),
   phpVersion:  text("php_version").notNull().default("8.3"),
+  // App instalada por el instalador 1-clic (null = docroot PHP en blanco).
+  // ej: "wordpress". Extensible a "laravel", "joomla", etc.
+  appType:     text("app_type"),
   // Ruta relativa dentro del home del cliente, ej: "blog" → /var/www/cli_xxx/blog/public
   docPath:     text("doc_path").notNull(),
   // cloudflare_dns_id para poder borrar el registro via API al eliminar el proyecto

@@ -15,6 +15,14 @@ type Project = {
   subdomain: string | null;
   phpVersion: string;
   status: string;
+  appType: string | null;
+};
+
+type InstallResult = {
+  adminUrl: string;
+  adminUser: string;
+  adminPassword: string;
+  siteUrl: string;
 };
 
 type Account = {
@@ -299,6 +307,7 @@ function ProjectsTable({
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [installing, setInstalling] = useState<Project | null>(null);
 
   async function rename(id: string) {
     setBusy(id);
@@ -342,6 +351,7 @@ function ProjectsTable({
             <tr>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Proyecto</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Dirección</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">App</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">PHP</th>
               <th className="px-4 py-3" />
             </tr>
@@ -349,7 +359,7 @@ function ProjectsTable({
           <tbody className="divide-y divide-gray-100">
             {projects.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                   Aún no tienes proyectos — crea el primero
                 </td>
               </tr>
@@ -383,6 +393,26 @@ function ProjectsTable({
                     <code className="font-mono text-xs text-gray-800">{p.domain}</code>
                   )}
                 </td>
+                <td className="px-4 py-3">
+                  {p.appType ? (
+                    <a
+                      href={`${p.status === "active" ? "https" : "http"}://${p.domain}/wp-admin`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 hover:bg-blue-100"
+                      title="Abrir el panel de administración"
+                    >
+                      {p.appType === "wordpress" ? "WordPress" : p.appType} ↗
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => setInstalling(p)}
+                      className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      Instalar app
+                    </button>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-gray-600">{p.phpVersion}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   {renaming !== p.id && (
@@ -413,6 +443,149 @@ function ProjectsTable({
           </tbody>
         </table>
       </div>
+
+      {installing && (
+        <InstallAppModal
+          project={installing}
+          onClose={() => setInstalling(null)}
+          onDone={() => { setInstalling(null); onChanged(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Modal de instalación 1-clic. Hoy solo WordPress; el catálogo crecerá.
+function InstallAppModal({
+  project,
+  onClose,
+  onDone,
+}: {
+  project: Project;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [title, setTitle] = useState(project.name);
+  const [adminUser, setAdminUser] = useState("admin");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [installing, setInstalling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<InstallResult | null>(null);
+
+  async function install() {
+    setInstalling(true);
+    setError(null);
+    try {
+      const res = await api<InstallResult>(`/portal/projects/${project.id}/install`, {
+        method: "POST",
+        body: JSON.stringify({
+          app: "wordpress",
+          title: title.trim(),
+          adminUser: adminUser.trim(),
+          adminEmail: adminEmail.trim() || undefined,
+        }),
+      });
+      setResult(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo instalar");
+    } finally {
+      setInstalling(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Instalar WordPress</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+        </div>
+
+        <div className="p-6">
+          {result ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                ✅ WordPress instalado. Guarda estas credenciales — la contraseña no se vuelve a mostrar.
+              </div>
+              <div className="space-y-2 text-sm">
+                <Cred label="Panel" value={result.adminUrl} link />
+                <Cred label="Usuario" value={result.adminUser} />
+                <Cred label="Contraseña" value={result.adminPassword} />
+              </div>
+              <button
+                onClick={onDone}
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700"
+              >
+                Listo
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+              )}
+              <p className="text-sm text-gray-500">
+                Se instalará en{" "}
+                <code className="font-mono text-xs text-gray-800">{project.domain}</code> y se creará una
+                base de datos dedicada automáticamente.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Título del sitio</label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Usuario admin</label>
+                  <input
+                    value={adminUser}
+                    onChange={(e) => setAdminUser(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email admin</label>
+                  <input
+                    type="email"
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="tu@email.com"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">
+                La contraseña de administrador se genera automáticamente y se te muestra al terminar.
+              </p>
+              <button
+                onClick={install}
+                disabled={installing || !title.trim() || !adminUser.trim()}
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {installing ? "Instalando… (puede tardar ~1 min)" : "Instalar WordPress"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Cred({ label, value, link }: { label: string; value: string; link?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+      <span className="text-gray-500">{label}</span>
+      {link ? (
+        <a href={value} target="_blank" rel="noreferrer" className="font-mono text-xs text-blue-600 hover:underline break-all">
+          {value}
+        </a>
+      ) : (
+        <code className="font-mono text-xs text-gray-900 break-all">{value}</code>
+      )}
     </div>
   );
 }
