@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "seo-tecnico-explicado-simple",
-      "category": "marketing",
-      "topics": [
-        "seo",
-        "performance"
-      ],
-      "es": "SEO técnico explicado simple para dueños de negocio",
-      "en": "Technical SEO explained simply for business owners"
-    },
-    {
       "key": "imagenes-optimizadas-web-rapida",
       "category": "web",
       "topics": [
@@ -313,6 +303,17 @@
       "es": "ERP para pymes: cuándo vale la pena y cuándo no",
       "en": "ERP for small businesses: when it's worth it and when not",
       "publishedAt": "2026-06-19"
+    },
+    {
+      "key": "seo-tecnico-explicado-simple",
+      "category": "marketing",
+      "topics": [
+        "seo",
+        "performance"
+      ],
+      "es": "SEO técnico explicado simple para dueños de negocio",
+      "en": "Technical SEO explained simply for business owners",
+      "publishedAt": "2026-06-20"
     }
   ]
 }
