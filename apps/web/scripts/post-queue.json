@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "imagenes-optimizadas-web-rapida",
-      "category": "web",
-      "topics": [
-        "performance",
-        "seo"
-      ],
-      "es": "Imágenes optimizadas: el truco para una web más rápida",
-      "en": "Optimized images: the trick to a faster website"
-    },
-    {
       "key": "integrar-tienda-con-logistica",
       "category": "ecommerce",
       "topics": [
@@ -314,6 +304,17 @@
       "es": "SEO técnico explicado simple para dueños de negocio",
       "en": "Technical SEO explained simply for business owners",
       "publishedAt": "2026-06-20"
+    },
+    {
+      "key": "imagenes-optimizadas-web-rapida",
+      "category": "web",
+      "topics": [
+        "performance",
+        "seo"
+      ],
+      "es": "Imágenes optimizadas: el truco para una web más rápida",
+      "en": "Optimized images: the trick to a faster website",
+      "publishedAt": "2026-06-21"
     }
   ]
 }
