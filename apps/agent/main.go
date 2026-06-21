@@ -82,6 +82,7 @@ func main() {
 		r.Route("/databases", func(r chi.Router) {
 			r.Post("/", handlers.CreateDatabase)
 			r.Post("/query", handlers.DatabaseQuery)
+			r.Post("/password", handlers.SetDatabasePassword)
 			r.Delete("/{dbName}", handlers.DeleteDatabase)
 		})
 

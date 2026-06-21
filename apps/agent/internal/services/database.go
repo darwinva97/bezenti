@@ -103,6 +103,29 @@ func (Database) CreateNamedDatabase(dbName, dbUser, password string) error {
 	return nil
 }
 
+// SetPassword cambia la contraseña del usuario de una BD en ambos hosts
+// (@localhost para la app PHP y @'%' para acceso externo). IF EXISTS para no
+// fallar si alguno de los dos hosts no estuviera creado.
+func (Database) SetPassword(dbUser, password string) error {
+	db, err := rootDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	stmts := []string{
+		fmt.Sprintf("ALTER USER IF EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, password),
+		fmt.Sprintf("ALTER USER IF EXISTS '%s'@'%%' IDENTIFIED BY '%s'", dbUser, password),
+		"FLUSH PRIVILEGES",
+	}
+	for _, s := range stmts {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("set password: %w", err)
+		}
+	}
+	return nil
+}
+
 // DropNamedDatabase elimina una BD y su usuario (rollback del instalador).
 func (Database) DropNamedDatabase(dbName, dbUser string) {
 	db, err := rootDB()

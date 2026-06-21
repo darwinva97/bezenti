@@ -41,6 +41,7 @@ function DatabasesPage() {
   const [justCreated, setJustCreated] = useState<CreatedDb | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [testDb, setTestDb] = useState<Database | null>(null);
+  const [pwdDb, setPwdDb] = useState<Database | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -151,6 +152,12 @@ function DatabasesPage() {
                       Probar / SQL
                     </button>
                     <button
+                      onClick={() => setPwdDb(d)}
+                      className="text-sm text-gray-600 hover:text-gray-800 mr-3"
+                    >
+                      Contraseña
+                    </button>
+                    <button
                       onClick={() => remove(d)}
                       disabled={busy === d.id}
                       className="text-sm text-red-500 hover:text-red-600 disabled:opacity-50"
@@ -183,7 +190,87 @@ function DatabasesPage() {
       </div>
 
       {testDb && <SqlModal db={testDb} onClose={() => setTestDb(null)} />}
+      {pwdDb && <PasswordModal db={pwdDb} onClose={() => setPwdDb(null)} />}
     </PortalLayout>
+  );
+}
+
+function PasswordModal({ db, onClose }: { db: Database; onClose: () => void }) {
+  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function change() {
+    if (password && password.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await api<{ ok: boolean; password: string }>(`/portal/databases/${db.id}/password`, {
+        method: "POST",
+        body: JSON.stringify({ password: password || undefined }),
+      });
+      setNewPassword(res.password);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cambiar la contraseña");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Cambiar contraseña — <span className="font-mono text-sm">{db.dbUser}</span>
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {newPassword ? (
+            <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-2">
+              <p className="text-sm font-medium text-green-800">
+                ✅ Contraseña actualizada. Guárdala — no se vuelve a mostrar.
+              </p>
+              <Row label="Nueva contraseña" value={newPassword} />
+              <p className="text-xs text-green-700">
+                Actualiza esta contraseña en la configuración de tu app (wp-config.php, .env, etc.).
+              </p>
+              <button onClick={onClose} className="text-xs text-green-700 hover:underline">Listo</button>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nueva contraseña</label>
+                <input
+                  type="text"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Déjalo vacío para generar una segura"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-400">Mínimo 8 caracteres. Si lo dejas vacío, se genera una aleatoria.</p>
+              </div>
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+              )}
+              <button
+                onClick={change}
+                disabled={saving}
+                className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Cambiando…" : "Cambiar contraseña"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

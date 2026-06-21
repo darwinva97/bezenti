@@ -136,6 +136,30 @@ func DatabaseQuery(w http.ResponseWriter, r *http.Request) {
 	respond(map[string]any{"ok": true, "columns": cols, "rows": out})
 }
 
+type setPasswordReq struct {
+	DBUser   string `json:"db_user"`
+	Password string `json:"password"`
+}
+
+// SetDatabasePassword cambia la contraseña del usuario MySQL de una BD del
+// cliente (ambos hosts). La nueva contraseña la decide el control plane.
+func SetDatabasePassword(w http.ResponseWriter, r *http.Request) {
+	var req setPasswordReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.DBUser == "" || req.Password == "" {
+		http.Error(w, "db_user y password son requeridos", http.StatusBadRequest)
+		return
+	}
+	if err := (services.Database{}).SetPassword(req.DBUser, req.Password); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // DeleteDatabase elimina una BD y su usuario. El usuario va como query ?user=.
 func DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	dbName := chi.URLParam(r, "dbName")

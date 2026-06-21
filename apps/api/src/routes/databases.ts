@@ -105,6 +105,42 @@ databasesRouter.post("/:id/query", async (c) => {
   return c.json(await res.json());
 });
 
+// Cambiar la contraseña del usuario de una BD del cliente. Si no se envía
+// `password`, se genera una aleatoria. La nueva credencial se guarda (la usa
+// "Probar conexión") y se devuelve una sola vez para que el cliente la copie.
+databasesRouter.post("/:id/password", async (c) => {
+  const userId   = c.get("user").id;
+  const db       = createDb(c.env.DB);
+  const database = await db.query.clientDatabases.findFirst({
+    where: eq(clientDatabases.id, c.req.param("id")),
+  });
+  if (!database) return c.json({ error: "not found" }, 404);
+
+  const client = await getClient(db, userId);
+  if (!client || database.clientId !== client.id) return c.json({ error: "forbidden" }, 403);
+  if (!client.node) return c.json({ error: "El hosting no tiene node asignado" }, 409);
+
+  const body = await c.req.json<{ password?: string }>().catch(() => ({} as { password?: string }));
+  let password = body.password?.trim();
+  if (password) {
+    if (password.length < 8) return c.json({ error: "La contraseña debe tener al menos 8 caracteres" }, 422);
+  } else {
+    password = crypto.randomUUID().replace(/-/g, "").slice(0, 20);
+  }
+
+  const agent = await agentFetch(client.node, "/databases/password", "POST", {
+    db_user:  database.dbUser,
+    password,
+  });
+  if (!agent.ok) return c.json({ error: agent.error }, 502);
+
+  await db.update(clientDatabases)
+    .set({ dbPasswordHash: password })
+    .where(eq(clientDatabases.id, database.id));
+
+  return c.json({ ok: true, password });
+});
+
 databasesRouter.delete("/:id", async (c) => {
   const userId   = c.get("user").id;
   const db       = createDb(c.env.DB);
