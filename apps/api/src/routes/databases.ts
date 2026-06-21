@@ -67,6 +67,44 @@ databasesRouter.post("/", async (c) => {
   return c.json({ id, dbName, dbUser: dbName, password }, 201);
 });
 
+// Probar conexión / ejecutar SQL contra una BD del cliente (vía el agente del
+// nodo, conectándose con las credenciales reales de esa BD).
+databasesRouter.post("/:id/query", async (c) => {
+  const userId   = c.get("user").id;
+  const db       = createDb(c.env.DB);
+  const database = await db.query.clientDatabases.findFirst({
+    where: eq(clientDatabases.id, c.req.param("id")),
+  });
+  if (!database) return c.json({ error: "not found" }, 404);
+
+  const client = await getClient(db, userId);
+  if (!client || database.clientId !== client.id) return c.json({ error: "forbidden" }, 403);
+  if (!client.node?.agentUrl || !client.node?.agentToken) {
+    return c.json({ error: "El hosting no tiene node disponible" }, 409);
+  }
+
+  const { sql } = await c.req.json<{ sql?: string }>().catch(() => ({ sql: undefined }));
+
+  let res: Response;
+  try {
+    res = await fetch(`${client.node.agentUrl}/databases/query`, {
+      method:  "POST",
+      headers: { "X-Agent-Token": client.node.agentToken, "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        db_name:  database.dbName,
+        db_user:  database.dbUser,
+        password: database.dbPasswordHash, // credencial real de la BD
+        sql:      sql ?? "",
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (err) {
+    return c.json({ error: `No se pudo contactar al agente: ${err instanceof Error ? err.message : err}` }, 502);
+  }
+  if (!res.ok) return c.json({ error: `El agente respondió ${res.status}` }, 502);
+  return c.json(await res.json());
+});
+
 databasesRouter.delete("/:id", async (c) => {
   const userId   = c.get("user").id;
   const db       = createDb(c.env.DB);

@@ -40,6 +40,7 @@ function DatabasesPage() {
   const [creating, setCreating] = useState(false);
   const [justCreated, setJustCreated] = useState<CreatedDb | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [testDb, setTestDb] = useState<Database | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -142,7 +143,13 @@ function DatabasesPage() {
                   <td className="px-4 py-3 font-mono text-gray-800">{d.dbName}</td>
                   <td className="px-4 py-3 font-mono text-gray-600">{d.dbUser}</td>
                   <td className="px-4 py-3 text-gray-600 capitalize">{d.engine}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <button
+                      onClick={() => setTestDb(d)}
+                      className="text-sm text-blue-600 hover:text-blue-700 mr-3"
+                    >
+                      Probar / SQL
+                    </button>
                     <button
                       onClick={() => remove(d)}
                       disabled={busy === d.id}
@@ -174,7 +181,125 @@ function DatabasesPage() {
           </p>
         </div>
       </div>
+
+      {testDb && <SqlModal db={testDb} onClose={() => setTestDb(null)} />}
     </PortalLayout>
+  );
+}
+
+type QueryResult = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  columns?: string[];
+  rows?: string[][];
+};
+
+function SqlModal({ db, onClose }: { db: Database; onClose: () => void }) {
+  const [sql, setSql] = useState("");
+  const [result, setResult] = useState<QueryResult | null>(null);
+  const [running, setRunning] = useState(false);
+
+  async function run(testOnly: boolean) {
+    setRunning(true);
+    setResult(null);
+    try {
+      const res = await api<QueryResult>(`/portal/databases/${db.id}/query`, {
+        method: "POST",
+        body: JSON.stringify({ sql: testOnly ? "" : sql }),
+      });
+      setResult(res);
+    } catch (err) {
+      setResult({ ok: false, error: err instanceof Error ? err.message : "Error" });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Probar conexión — <span className="font-mono text-sm">{db.dbName}</span>
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => run(true)}
+              disabled={running}
+              className="bg-green-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {running ? "Probando…" : "Probar conexión"}
+            </button>
+            <span className="text-xs text-gray-400">
+              Conecta como <code className="font-mono">{db.dbUser}</code> y corre una consulta de prueba.
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">…o ejecuta tu propio SQL</label>
+            <textarea
+              value={sql}
+              onChange={(e) => setSql(e.target.value)}
+              rows={3}
+              placeholder="SELECT * FROM mi_tabla LIMIT 10;"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={() => run(false)}
+              disabled={running || !sql.trim()}
+              className="mt-2 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {running ? "Ejecutando…" : "Ejecutar SQL"}
+            </button>
+          </div>
+
+          {result && (
+            <div>
+              {result.ok ? (
+                result.columns ? (
+                  <div className="border border-gray-200 rounded-lg overflow-auto max-h-72">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          {result.columns.map((col) => (
+                            <th key={col} className="text-left px-3 py-2 font-medium text-gray-600 whitespace-nowrap">{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {(result.rows ?? []).map((row, i) => (
+                          <tr key={i}>
+                            {row.map((cell, j) => (
+                              <td key={j} className="px-3 py-1.5 font-mono text-gray-800 whitespace-nowrap">{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                        {(result.rows ?? []).length === 0 && (
+                          <tr><td className="px-3 py-3 text-gray-400" colSpan={result.columns.length}>0 filas</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                    ✅ {result.message ?? "Conexión correcta"}
+                  </div>
+                )
+              ) : (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-mono whitespace-pre-wrap">
+                  {result.error}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

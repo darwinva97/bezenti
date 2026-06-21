@@ -81,6 +81,7 @@ func main() {
 		// Bases de datos independientes del cliente
 		r.Route("/databases", func(r chi.Router) {
 			r.Post("/", handlers.CreateDatabase)
+			r.Post("/query", handlers.DatabaseQuery)
 			r.Delete("/{dbName}", handlers.DeleteDatabase)
 		})
 
