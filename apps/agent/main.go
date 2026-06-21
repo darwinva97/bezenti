@@ -57,6 +57,10 @@ func main() {
 		// Auto-actualización: el control plane envía la URL del binario nuevo
 		r.Post("/update", handlers.Update)
 
+		// Consola web (admin): ver logs y ejecutar comandos en el nodo
+		r.Get("/logs", handlers.Logs)
+		r.Post("/exec", handlers.Exec)
+
 		r.Route("/clients", func(r chi.Router) {
 			r.Post("/", handlers.CreateClient)
 			r.Delete("/{clientID}", handlers.DeleteClient)

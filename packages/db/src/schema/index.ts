@@ -8,4 +8,5 @@ export * from "./databases";
 export * from "./email";
 export * from "./dns";
 export * from "./metrics";
+export * from "./console";
 export * from "./relations";

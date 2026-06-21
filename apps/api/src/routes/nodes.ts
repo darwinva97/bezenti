@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { createDb, nodes, nodeMetrics, providers } from "@bezenti/db";
+import { createDb, nodes, nodeMetrics, providers, nodeCommands } from "@bezenti/db";
 import { eq, desc } from "drizzle-orm";
 import type { Env } from "../env";
 import { sshRun } from "../lib/ssh";
@@ -227,6 +227,84 @@ nodesRouter.post("/:id/update-agent", async (c) => {
     targetVersion: agentTargetVersion(c.env.AGENT_BINARY_URL),
     detail:        await res.json().catch(() => null),
   });
+});
+
+// ── Consola web por nodo (admin) ──────────────────────────────────────────────
+
+// Llama al agente del nodo con su token. Devuelve la Response cruda.
+async function callAgent(
+  node: { agentUrl: string | null; agentToken: string | null },
+  path: string,
+  init: RequestInit,
+): Promise<Response> {
+  if (!node.agentUrl || !node.agentToken) throw new Error("El nodo no tiene agente configurado");
+  return fetch(`${node.agentUrl}${path}`, {
+    ...init,
+    headers: { "X-Agent-Token": node.agentToken, "Content-Type": "application/json", ...(init.headers ?? {}) },
+    signal: AbortSignal.timeout(35000),
+  });
+}
+
+// Logs del nodo (instalación / agente / cloud-init).
+nodesRouter.get("/:id/logs", async (c) => {
+  const db   = createDb(c.env.DB);
+  const node = await db.query.nodes.findFirst({ where: eq(nodes.id, c.req.param("id")) });
+  if (!node) return c.json({ error: "not found" }, 404);
+
+  const source = c.req.query("source") ?? "install";
+  const lines  = c.req.query("lines") ?? "200";
+  try {
+    const res = await callAgent(node, `/logs?source=${encodeURIComponent(source)}&lines=${encodeURIComponent(lines)}`, { method: "GET" });
+    if (!res.ok) return c.json({ error: `El agente respondió ${res.status}` }, 502);
+    return c.json(await res.json());
+  } catch (err) {
+    return c.json({ error: `No se pudo contactar al agente: ${err instanceof Error ? err.message : err}` }, 502);
+  }
+});
+
+// Ejecuta un comando en el nodo y guarda el resultado en el historial.
+nodesRouter.post("/:id/exec", async (c) => {
+  const db   = createDb(c.env.DB);
+  const node = await db.query.nodes.findFirst({ where: eq(nodes.id, c.req.param("id")) });
+  if (!node) return c.json({ error: "not found" }, 404);
+
+  const body = await c.req.json<{ command: string; timeoutSec?: number }>();
+  if (!body.command?.trim()) return c.json({ error: "command es requerido" }, 400);
+
+  let result: { output: string; exitCode: number; timedOut: boolean };
+  try {
+    const res = await callAgent(node, "/exec", {
+      method: "POST",
+      body:   JSON.stringify({ command: body.command, timeout_sec: body.timeoutSec }),
+    });
+    if (!res.ok) return c.json({ error: `El agente respondió ${res.status}: ${(await res.text()).slice(0, 300)}` }, 502);
+    result = await res.json();
+  } catch (err) {
+    return c.json({ error: `No se pudo contactar al agente: ${err instanceof Error ? err.message : err}` }, 502);
+  }
+
+  // Guardar en el historial (salida truncada para almacenamiento).
+  await db.insert(nodeCommands).values({
+    id:        crypto.randomUUID(),
+    nodeId:    node.id,
+    command:   body.command,
+    exitCode:  result.exitCode,
+    output:    result.output.slice(0, 10_000),
+    createdAt: new Date(),
+  });
+
+  return c.json(result);
+});
+
+// Historial de comandos del nodo (más recientes primero).
+nodesRouter.get("/:id/commands", async (c) => {
+  const db   = createDb(c.env.DB);
+  const rows = await db.query.nodeCommands.findMany({
+    where:   eq(nodeCommands.nodeId, c.req.param("id")),
+    orderBy: desc(nodeCommands.createdAt),
+    limit:   50,
+  });
+  return c.json(rows);
 });
 
 nodesRouter.delete("/:id", async (c) => {

@@ -83,6 +83,7 @@ function NodesPage() {
   const [loading, setLoading]     = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [resetNode, setResetNode] = useState<NodeRow | null>(null);
+  const [consoleNode, setConsoleNode] = useState<NodeRow | null>(null);
 
   async function fetchNodes() {
     const res = await fetch(`${API}/admin/nodes`, { credentials: "include" });
@@ -151,6 +152,7 @@ function NodesPage() {
                     node={n}
                     onReset={() => setResetNode(n)}
                     onDelete={() => handleDelete(n)}
+                    onConsole={() => setConsoleNode(n)}
                   />
                 ))
               )}
@@ -172,6 +174,10 @@ function NodesPage() {
           onClose={() => { setResetNode(null); fetchNodes(); }}
           onSuccess={() => { setResetNode(null); fetchNodes(); }}
         />
+      )}
+
+      {consoleNode && (
+        <ConsoleModal node={consoleNode} onClose={() => setConsoleNode(null)} />
       )}
     </AdminLayout>
   );
@@ -423,8 +429,8 @@ type AgentInfo = {
   updateAvailable: boolean;
 };
 
-function NodeTableRow({ node, onReset, onDelete }: {
-  node: NodeRow; onReset: () => void; onDelete: () => void;
+function NodeTableRow({ node, onReset, onDelete, onConsole }: {
+  node: NodeRow; onReset: () => void; onDelete: () => void; onConsole: () => void;
 }) {
   const st = STATUS[node.status] ?? STATUS["offline"]!;
   const [info, setInfo]       = useState<AgentInfo | null>(null);
@@ -492,6 +498,9 @@ function NodeTableRow({ node, onReset, onDelete }: {
               Reintentar
             </button>
           )}
+          <button onClick={onConsole} className="text-xs font-medium text-gray-700 hover:underline">
+            Consola
+          </button>
           <button onClick={onDelete} className="text-xs font-medium text-red-600 hover:underline">
             Eliminar
           </button>
@@ -683,6 +692,156 @@ function ResetNodeModal({ node, onClose, onSuccess }: {
                 className="text-sm text-blue-600 hover:underline">
                 ← Volver
               </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Consola web por nodo ──────────────────────────────────────────────────────
+
+type CommandRow = { id: string; command: string; exitCode: number | null; output: string | null; createdAt: number };
+
+function ConsoleModal({ node, onClose }: { node: NodeRow; onClose: () => void }) {
+  const [tab, setTab] = useState<"install" | "agent" | "cloudinit">("install");
+  const [logs, setLogs] = useState("");
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [command, setCommand] = useState("");
+  const [running, setRunning] = useState(false);
+  const [output, setOutput] = useState<{ cmd: string; out: string; code: number }[]>([]);
+  const [history, setHistory] = useState<CommandRow[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function loadLogs(source: typeof tab) {
+    setTab(source);
+    setLoadingLogs(true);
+    setErr(null);
+    try {
+      const res = await fetch(`${API}/admin/nodes/${node.id}/logs?source=${source}&lines=300`, { credentials: "include" });
+      const b = await res.json();
+      if (!res.ok) throw new Error((b as { error?: string }).error ?? `Error ${res.status}`);
+      setLogs((b as { logs: string }).logs || "(vacío)");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudieron cargar los logs");
+      setLogs("");
+    } finally {
+      setLoadingLogs(false);
+    }
+  }
+
+  async function loadHistory() {
+    const res = await fetch(`${API}/admin/nodes/${node.id}/commands`, { credentials: "include" });
+    if (res.ok) setHistory(await res.json());
+  }
+
+  useEffect(() => { loadLogs("install"); loadHistory(); /* eslint-disable-next-line */ }, []);
+
+  async function run() {
+    if (!command.trim()) return;
+    setRunning(true);
+    setErr(null);
+    const cmd = command;
+    try {
+      const res = await fetch(`${API}/admin/nodes/${node.id}/exec`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: cmd }),
+      });
+      const b = await res.json();
+      if (!res.ok) throw new Error((b as { error?: string }).error ?? `Error ${res.status}`);
+      const r = b as { output: string; exitCode: number; timedOut: boolean };
+      setOutput((o) => [...o, { cmd, out: r.output + (r.timedOut ? "\n…(timeout)" : ""), code: r.exitCode }]);
+      setCommand("");
+      loadHistory();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo ejecutar");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const tabs: { key: typeof tab; label: string }[] = [
+    { key: "install", label: "Instalación" },
+    { key: "agent", label: "Agente" },
+    { key: "cloudinit", label: "cloud-init" },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Consola — {node.name} <span className="font-mono text-xs text-gray-400">{node.ipPublic}</span>
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {err && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
+
+          {/* Logs */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex gap-1">
+                {tabs.map((t) => (
+                  <button key={t.key} onClick={() => loadLogs(t.key)}
+                    className={`text-xs px-2.5 py-1 rounded-lg ${tab === t.key ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-500 hover:bg-gray-100"}`}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => loadLogs(tab)} className="text-xs text-gray-500 hover:text-gray-800">
+                {loadingLogs ? "Cargando…" : "↻ Actualizar"}
+              </button>
+            </div>
+            <pre className="bg-gray-900 text-gray-100 text-xs font-mono rounded-lg p-3 h-56 overflow-auto whitespace-pre-wrap">
+              {logs || "(sin contenido)"}
+            </pre>
+          </div>
+
+          {/* Ejecutar comando */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ejecutar comando (root)</label>
+            <div className="flex gap-2">
+              <input value={command} onChange={(e) => setCommand(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") run(); }}
+                placeholder="systemctl status mariadb --no-pager"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <button onClick={run} disabled={running || !command.trim()}
+                className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                {running ? "…" : "Ejecutar"}
+              </button>
+            </div>
+            {output.length > 0 && (
+              <div className="mt-2 bg-gray-900 rounded-lg p-3 max-h-56 overflow-auto space-y-2">
+                {output.map((o, i) => (
+                  <div key={i} className="text-xs font-mono">
+                    <div className="text-green-400">$ {o.cmd} <span className="text-gray-500">(exit {o.code})</span></div>
+                    <pre className="text-gray-100 whitespace-pre-wrap">{o.out || "(sin salida)"}</pre>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Historial */}
+          {history.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Historial</h3>
+              <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-40 overflow-auto">
+                {history.map((h) => (
+                  <button key={h.id} onClick={() => setCommand(h.command)}
+                    className="w-full text-left px-3 py-1.5 hover:bg-gray-50 flex items-center justify-between gap-2">
+                    <code className="text-xs text-gray-800 truncate">{h.command}</code>
+                    <span className={`text-[10px] shrink-0 ${h.exitCode === 0 ? "text-green-600" : "text-red-600"}`}>
+                      exit {h.exitCode ?? "?"}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
