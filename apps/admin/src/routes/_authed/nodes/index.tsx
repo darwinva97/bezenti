@@ -22,7 +22,31 @@ type NodeRow = {
   ramMbTotal: number | null;
   lastHeartbeatAt: string | null;
   stale?: boolean;
+  clientsCount?: number;
+  committedDiskMb?: number;
+  committedRamMb?: number;
 };
+
+// Barra comprometido/total con color según saturación.
+function CapacityBar({ usedMb, totalMb, unit }: { usedMb: number; totalMb: number | null; unit: "GB" }) {
+  const totalGb = totalMb ? totalMb / 1024 : null;
+  const usedGb = usedMb / 1024;
+  const pct = totalMb && totalMb > 0 ? Math.min(100, Math.round((usedMb / totalMb) * 100)) : 0;
+  const color = pct >= 90 ? "bg-red-500" : pct >= 75 ? "bg-amber-500" : "bg-blue-600";
+  return (
+    <div className="w-28">
+      <div className="text-xs text-gray-600">
+        {usedGb.toFixed(usedGb >= 10 ? 0 : 1)}
+        {totalGb !== null ? ` / ${totalGb.toFixed(0)}` : ""} {unit}
+      </div>
+      {totalGb !== null && (
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+          <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Tiempo relativo desde el último heartbeat, ej: "hace 5 min".
 function lastSeen(iso: string | null): string {
@@ -102,7 +126,7 @@ function NodesPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {["Node", "Proveedor", "IP", "RAM", "Disco", "Estado", "Acciones"].map((h) => (
+                {["Node", "Proveedor", "IP", "Clientes", "Disco (comprometido)", "Estado", "Acciones"].map((h) => (
                   <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>
                 ))}
               </tr>
@@ -439,11 +463,9 @@ function NodeTableRow({ node, onReset, onDelete }: {
       </td>
       <td className="px-4 py-3 text-gray-600 capitalize">{node.provider}</td>
       <td className="px-4 py-3 font-mono text-gray-600">{node.ipPublic}</td>
-      <td className="px-4 py-3 text-gray-600">
-        {node.ramMbTotal ? `${Math.round(node.ramMbTotal / 1024)} GB` : "—"}
-      </td>
-      <td className="px-4 py-3 text-gray-600">
-        {node.diskGbTotal ? `${node.diskGbTotal} GB` : "—"}
+      <td className="px-4 py-3 text-gray-600">{node.clientsCount ?? 0}</td>
+      <td className="px-4 py-3">
+        <CapacityBar usedMb={node.committedDiskMb ?? 0} totalMb={node.diskGbTotal ? node.diskGbTotal * 1024 : null} unit="GB" />
       </td>
       <td className="px-4 py-3">
         <span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>

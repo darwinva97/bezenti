@@ -38,7 +38,35 @@ nodesRouter.get("/", async (c) => {
   const rows = await db.query.nodes.findMany({
     orderBy: desc(nodes.createdAt),
   });
-  return c.json(rows.map(withEffectiveStatus));
+
+  // Capacidad comprometida por nodo: suma de los planes de sus clientes
+  // activos. Sirve para decidir si un VPS ya está lleno o se puede seguir
+  // colocando clientes antes de aprovisionar otro.
+  const clientRows = await db.query.clients.findMany({
+    with:    { plan: { columns: { diskMb: true, ramMbSoft: true } } },
+    columns: { nodeId: true, status: true },
+  });
+  const committed = new Map<string, { clients: number; diskMb: number; ramMb: number }>();
+  for (const cl of clientRows) {
+    if (cl.status === "deleted") continue;
+    const agg = committed.get(cl.nodeId) ?? { clients: 0, diskMb: 0, ramMb: 0 };
+    agg.clients += 1;
+    agg.diskMb  += cl.plan?.diskMb ?? 0;
+    agg.ramMb   += cl.plan?.ramMbSoft ?? 0;
+    committed.set(cl.nodeId, agg);
+  }
+
+  return c.json(
+    rows.map((n) => {
+      const agg = committed.get(n.id) ?? { clients: 0, diskMb: 0, ramMb: 0 };
+      return {
+        ...withEffectiveStatus(n),
+        clientsCount:     agg.clients,
+        committedDiskMb:  agg.diskMb,
+        committedRamMb:   agg.ramMb,
+      };
+    }),
+  );
 });
 
 nodesRouter.get("/:id", async (c) => {

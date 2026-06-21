@@ -74,6 +74,12 @@ func main() {
 			r.Post("/{projectID}/install", handlers.InstallApp)
 		})
 
+		// Bases de datos independientes del cliente
+		r.Route("/databases", func(r chi.Router) {
+			r.Post("/", handlers.CreateDatabase)
+			r.Delete("/{dbName}", handlers.DeleteDatabase)
+		})
+
 		// Zonas DNS de clientes (PowerDNS local)
 		r.Route("/dns", func(r chi.Router) {
 			r.Put("/zones/{zone}", handlers.SyncDnsZone)
