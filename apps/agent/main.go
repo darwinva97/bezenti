@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -18,6 +21,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"golang.org/x/crypto/acme/autocert"
 
 	"bezenti/agent/internal/handlers"
 	agentmw "bezenti/agent/internal/middleware"
@@ -111,6 +115,18 @@ func main() {
 
 	// Heartbeat goroutine: informa al control plane que este nodo está vivo.
 	go heartbeatLoop(controlPlaneURL, nodeID, token)
+
+	// TLS goroutine: termina HTTPS en :443 con certs Let's Encrypt automáticos y
+	// proxy a Unit en :80. Aislada con recover para que un fallo de TLS nunca
+	// tumbe el agente ni el :80 (peor caso: https no disponible, http intacto).
+	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				slog.Error("tls: panic recuperado — https deshabilitado, :80 intacto", "panic", rec)
+			}
+		}()
+		startTLSProxy()
+	}()
 
 	slog.Info("agent listening", "port", port, "nodeID", nodeID)
 	if err := http.ListenAndServe(":"+port, r); err != nil {
@@ -250,6 +266,61 @@ func discoverPublicIP() string {
 	}
 
 	return ""
+}
+
+// startTLSProxy levanta un servidor HTTPS en :443 que termina TLS con
+// certificados Let's Encrypt obtenidos automáticamente (autocert, desafío
+// TLS-ALPN-01 sobre el propio :443 — no requiere :80 libre ni token DNS) y
+// hace de reverse proxy a NGINX Unit en :80, que rutea por Host. Así cada
+// proyecto <sub>--<slug>.pages.bezenti.com queda servido por https sin pasos
+// manuales ni costo. Los certs se cachean en disco y autocert los renueva solo.
+//
+// Sólo se emiten certs para hosts bajo PAGES_DOMAIN (HostPolicy), para que un
+// SNI arbitrario no dispare emisiones (rate limit de Let's Encrypt: ~50
+// certs/semana por dominio registrado).
+func startTLSProxy() {
+	pagesDomain := os.Getenv("PAGES_DOMAIN")
+	if pagesDomain == "" {
+		pagesDomain = "pages.bezenti.com"
+	}
+	suffix := "." + pagesDomain
+
+	cacheDir := os.Getenv("TLS_CACHE_DIR")
+	if cacheDir == "" {
+		cacheDir = "/var/lib/bezenti-agent/certs"
+	}
+	if err := os.MkdirAll(cacheDir, 0o700); err != nil {
+		slog.Error("tls: no se pudo crear el cache de certs — https deshabilitado", "err", err)
+		return
+	}
+
+	m := &autocert.Manager{
+		Prompt: autocert.AcceptTOS,
+		Cache:  autocert.DirCache(cacheDir),
+		HostPolicy: func(_ context.Context, host string) error {
+			if strings.HasSuffix(host, suffix) {
+				return nil
+			}
+			return fmt.Errorf("host no permitido para TLS: %s", host)
+		},
+	}
+
+	// Proxy a Unit en :80, preservando el Host original para que Unit rutee al
+	// vhost correcto (Unit termina HTTP plano; el TLS lo cierra este server).
+	upstream := &url.URL{Scheme: "http", Host: "127.0.0.1:80"}
+	proxy := httputil.NewSingleHostReverseProxy(upstream)
+
+	srv := &http.Server{
+		Addr:      ":443",
+		Handler:   proxy,
+		TLSConfig: m.TLSConfig(), // GetCertificate de autocert + ALPN acme-tls/1
+	}
+
+	slog.Info("tls: https en :443 con autocert", "pagesDomain", pagesDomain, "cache", cacheDir)
+	// Con TLSConfig.GetCertificate, los args de cert/key van vacíos.
+	if err := srv.ListenAndServeTLS("", ""); err != nil {
+		slog.Error("tls: el servidor https terminó", "err", err)
+	}
 }
 
 // ── Métricas del sistema ──────────────────────────────────────────────────────

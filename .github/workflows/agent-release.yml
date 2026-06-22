@@ -23,6 +23,13 @@ jobs:
           go-version-file: apps/agent/go.mod
           cache-dependency-path: apps/agent/go.sum
 
+      # Resuelve dependencias nuevas (p. ej. golang.org/x/crypto para autocert)
+      # y completa go.sum. Se hace en CI porque el entorno de desarrollo no
+      # siempre tiene el toolchain de Go para generar go.sum a mano.
+      - name: Tidy modules
+        working-directory: apps/agent
+        run: go mod tidy
+
       - name: Build binaries
         working-directory: apps/agent
         run: |
