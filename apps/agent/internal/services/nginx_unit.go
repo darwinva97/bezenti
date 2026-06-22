@@ -118,25 +118,31 @@ func (NginxUnit) SetPhpUploadLimit(appKey string, uploadMB int) error {
 		return err
 	}
 
-	// Subir el max_body_size global de Unit. Se hace PUT del objeto settings/http
-	// COMPLETO (no del campo suelto): Unit no crea rutas profundas si falta el
-	// padre, y settings/http puede no existir aún (daría 404 "Value doesn't exist").
+	// Subir el max_body_size global de Unit. Hay que hacer PUT del objeto
+	// /config/settings COMPLETO: Unit no crea rutas si falta el padre, y por
+	// defecto ni `settings` ni `settings/http` existen (PUT a un hijo daría 404
+	// "Value doesn't exist"). `/config` siempre existe, así que PUT ahí con merge.
 	postBytes := int64(postMB) * 1024 * 1024
-	httpCfg := settingsHTTP()
+	settings := getConfig("/config/settings")
+	httpCfg, _ := settings["http"].(map[string]any)
+	if httpCfg == nil {
+		httpCfg = map[string]any{}
+	}
 	cur, _ := httpCfg["max_body_size"].(float64) // los números JSON llegan como float64
 	if postBytes > int64(cur) {
 		httpCfg["max_body_size"] = postBytes
-		if err := unitPut("/config/settings/http", httpCfg); err != nil {
+		settings["http"] = httpCfg
+		if err := unitPut("/config/settings", settings); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// settingsHTTP lee /config/settings/http (vacío si no existe) para modificar
-// max_body_size sin perder otros ajustes.
-func settingsHTTP() map[string]any {
-	req, _ := http.NewRequest(http.MethodGet, unitSocket+"/config/settings/http", nil)
+// getConfig lee un objeto de la config de Unit (vacío si no existe), para poder
+// hacer merge antes de un PUT y no perder otros ajustes.
+func getConfig(path string) map[string]any {
+	req, _ := http.NewRequest(http.MethodGet, unitSocket+path, nil)
 	resp, err := unitClient.Do(req)
 	if err != nil {
 		return map[string]any{}
