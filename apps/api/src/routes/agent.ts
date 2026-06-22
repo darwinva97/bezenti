@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { createDb, nodes, nodeMetrics, clientMetrics, clients } from "@bezenti/db";
 import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../env";
+import { syncInfraWildcards } from "../lib/infra-dns";
 
 // Rutas llamadas por el node agent (no por el panel)
 // Autenticadas con el token propio del node (X-Agent-Token)
@@ -35,6 +36,9 @@ agentRouter.post("/register", async (c) => {
     lastHeartbeatAt:  new Date(),
   });
 
+  // Apuntar el wildcard de infraestructura (*.pages/*.db) a la IP del node nuevo.
+  c.executionCtx.waitUntil(syncInfraWildcards(c.env, body.ipPublic));
+
   return c.json({ id, agentUrl }, 201);
 });
 
@@ -44,6 +48,7 @@ agentRouter.post("/heartbeat", async (c) => {
   const body      = await c.req.json<{
     nodeId:       string;
     agentUrl?:    string;
+    publicIp?:    string;
     cpuPct:       number;
     ramUsedMb:    number;
     diskUsedGb:   number;
@@ -67,6 +72,12 @@ agentRouter.post("/heartbeat", async (c) => {
 
   const now = new Date();
 
+  // El agente reporta la IP pública que ve internet. Si cambió (p. ej. el
+  // proveedor reasignó IP al recrear el VPS), la persistimos y reapuntamos el
+  // wildcard DNS *.pages/*.db a ella — así los proyectos y las BD siguen al node
+  // sin intervención manual.
+  const ipChanged = !!body.publicIp && body.publicIp !== node.ipPublic;
+
   // Actualizar último heartbeat del node. El agente reporta su URL pública
   // de tunnel (cloudflared); la persistimos para que el control plane pueda
   // alcanzarlo aunque la URL del quick tunnel cambie tras un reinicio.
@@ -74,7 +85,11 @@ agentRouter.post("/heartbeat", async (c) => {
     lastHeartbeatAt: now,
     status:          "ready",
     ...(body.agentUrl && body.agentUrl !== node.agentUrl ? { agentUrl: body.agentUrl } : {}),
+    ...(ipChanged ? { ipPublic: body.publicIp } : {}),
   }).where(eq(nodes.id, body.nodeId));
+
+  // Best-effort, fuera del camino de respuesta: reapuntar el DNS de infra.
+  if (ipChanged) c.executionCtx.waitUntil(syncInfraWildcards(c.env, body.publicIp!));
 
   // Guardar métricas del node
   await db.insert(nodeMetrics).values({
