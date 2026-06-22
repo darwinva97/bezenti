@@ -80,7 +80,10 @@ func (NginxUnit) CreateProjectApp(appKey, user, docRoot string, memoryMB, maxPro
 		},
 		"options": map[string]any{
 			"admin": map[string]string{
-				"memory_limit": fmt.Sprintf("%dM", memoryMB),
+				"memory_limit":        fmt.Sprintf("%dM", memoryMB),
+				"upload_max_filesize": fmt.Sprintf("%dM", DefaultUploadMaxMB),
+				"post_max_size":       fmt.Sprintf("%dM", DefaultUploadMaxMB+16),
+				"max_execution_time":  "300",
 			},
 		},
 		"processes": map[string]any{
@@ -90,6 +93,57 @@ func (NginxUnit) CreateProjectApp(appKey, user, docRoot string, memoryMB, maxPro
 		},
 	}
 	return unitPut("/config/applications/"+appKey, app)
+}
+
+// DefaultUploadMaxMB es el límite de subida por defecto de un proyecto (MB).
+const DefaultUploadMaxMB = 64
+
+// SetPhpUploadLimit ajusta el límite de subida de un proyecto: upload_max_filesize
+// y post_max_size en la app, y sube el max_body_size global de Unit si hace falta
+// (de lo contrario Unit corta el cuerpo de la petición antes de llegar a PHP).
+// Nunca baja el límite global (otros proyectos podrían necesitarlo más alto).
+func (NginxUnit) SetPhpUploadLimit(appKey string, uploadMB int) error {
+	if uploadMB < 1 {
+		uploadMB = 1
+	}
+	postMB := uploadMB + 16
+	base := "/config/applications/" + appKey + "/options/admin/"
+	if err := unitPut(base+"upload_max_filesize", fmt.Sprintf("%dM", uploadMB)); err != nil {
+		return err
+	}
+	if err := unitPut(base+"post_max_size", fmt.Sprintf("%dM", postMB)); err != nil {
+		return err
+	}
+	if err := unitPut(base+"max_execution_time", "300"); err != nil {
+		return err
+	}
+
+	postBytes := int64(postMB) * 1024 * 1024
+	if cur := maxBodySize(); postBytes > cur {
+		if err := unitPut("/config/settings/http/max_body_size", postBytes); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// maxBodySize lee el límite global de cuerpo de Unit (bytes); 8 MiB si no está.
+func maxBodySize() int64 {
+	req, _ := http.NewRequest(http.MethodGet, unitSocket+"/config/settings/http/max_body_size", nil)
+	resp, err := unitClient.Do(req)
+	if err != nil {
+		return 8 * 1024 * 1024
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 8 * 1024 * 1024
+	}
+	body, _ := io.ReadAll(resp.Body)
+	var n int64
+	if json.Unmarshal(body, &n) != nil {
+		return 8 * 1024 * 1024
+	}
+	return n
 }
 
 // AppRoot expone appRoot para otros handlers (p. ej. SSO necesita el docroot).

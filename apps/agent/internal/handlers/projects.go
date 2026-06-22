@@ -23,6 +23,7 @@ type createProjectReq struct {
 	PhpVersion    string   `json:"php_version"`
 	MemoryLimitMB int      `json:"memory_limit_mb"`
 	MaxProcesses  int      `json:"max_processes"`
+	UploadMaxMB   int      `json:"upload_max_mb"`
 	Hosts         []string `json:"hosts"`
 }
 
@@ -58,9 +59,42 @@ func CreateProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Aplicar el límite de subida (persistido en el control plane) — así una
+	// re-provisión conserva lo que el cliente haya configurado.
+	uploadMB := req.UploadMaxMB
+	if uploadMB < 1 {
+		uploadMB = services.DefaultUploadMaxMB
+	}
+	if err := unit.SetPhpUploadLimit(appKey, uploadMB); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]any{"app": appKey, "doc_root": docRoot})
+}
+
+// SetProjectPhpLimits ajusta los límites PHP de subida del proyecto (lo llama
+// el control plane cuando el cliente cambia el límite desde el panel).
+func SetProjectPhpLimits(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "projectID")
+	var req struct {
+		UploadMaxMB int `json:"upload_max_mb"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.UploadMaxMB < 1 || req.UploadMaxMB > 1024 {
+		http.Error(w, "upload_max_mb fuera de rango (1–1024)", http.StatusBadRequest)
+		return
+	}
+	if err := (services.NginxUnit{}).SetPhpUploadLimit(projectAppKey(projectID), req.UploadMaxMB); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ProjectSSO genera un token de login 1-clic para el WordPress del proyecto.

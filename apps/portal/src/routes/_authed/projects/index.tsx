@@ -16,7 +16,10 @@ type Project = {
   phpVersion: string;
   status: string;
   appType: string | null;
+  uploadMaxMb: number | null;
 };
+
+const DEFAULT_UPLOAD_MB = 64;
 
 type InstallResult = {
   adminUrl: string;
@@ -308,6 +311,7 @@ function ProjectsTable({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [installing, setInstalling] = useState<Project | null>(null);
+  const [uploadProj, setUploadProj] = useState<Project | null>(null);
   const [ssoBusy, setSsoBusy] = useState<string | null>(null);
 
   async function wpLogin(p: Project) {
@@ -449,6 +453,13 @@ function ProjectsTable({
                         </button>
                       )}
                       <button
+                        onClick={() => setUploadProj(p)}
+                        className="text-sm text-gray-600 hover:text-gray-800 mr-3"
+                        title="Tamaño máximo de subida (plugins, temas, medios)"
+                      >
+                        Subidas
+                      </button>
+                      <button
                         onClick={() => remove(p)}
                         disabled={busy === p.id}
                         className="text-sm text-red-500 hover:text-red-600 disabled:opacity-50"
@@ -471,6 +482,110 @@ function ProjectsTable({
           onDone={() => { setInstalling(null); onChanged(); }}
         />
       )}
+
+      {uploadProj && (
+        <UploadLimitModal
+          project={uploadProj}
+          onClose={() => setUploadProj(null)}
+          onSaved={() => { setUploadProj(null); onChanged(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Configurar el tamaño máximo de subida del proyecto (estilo php.ini).
+function UploadLimitModal({
+  project,
+  onClose,
+  onSaved,
+}: {
+  project: Project;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const current = project.uploadMaxMb ?? DEFAULT_UPLOAD_MB;
+  const [value, setValue] = useState(String(current));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    const mb = Math.floor(Number(value));
+    if (!Number.isFinite(mb) || mb < 1 || mb > 1024) {
+      setError("Ingresa un número entre 1 y 1024 MB");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await api(`/portal/projects/${project.id}/php-limits`, {
+        method: "POST",
+        body: JSON.stringify({ uploadMaxMb: mb }),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Tamaño máximo de subida</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-gray-500">
+            Límite para subir plugins, temas y archivos en{" "}
+            <code className="font-mono text-xs text-gray-800">{project.domain}</code>. Aplica de
+            inmediato, sin reiniciar.
+          </p>
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Límite (MB)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={1024}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-500">MB (máx. 1024)</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {[64, 128, 256, 512].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setValue(String(n))}
+                  className="text-xs px-2 py-1 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50"
+                >
+                  {n} MB
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={save}
+              disabled={saving}
+              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? "Guardando…" : "Guardar"}
+            </button>
+            <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700 px-2">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

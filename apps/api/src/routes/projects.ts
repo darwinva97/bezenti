@@ -302,6 +302,33 @@ projectsRouter.post("/:id/wp-login", async (c) => {
   return c.json({ url: `${scheme}://${project.domain}/?bezenti_sso=${encodeURIComponent(token)}` });
 });
 
+// Configurar el límite de subida del proyecto (upload_max_filesize, estilo
+// php.ini) — el cliente lo sube para instalar plugins/temas grandes. 1–1024 MB.
+projectsRouter.post("/:id/php-limits", async (c) => {
+  const user = c.get("user");
+  const { uploadMaxMb } = await c.req.json<{ uploadMaxMb?: number }>().catch(() => ({ uploadMaxMb: undefined }));
+
+  const mb = Math.floor(Number(uploadMaxMb));
+  if (!Number.isFinite(mb) || mb < 1 || mb > 1024) {
+    return c.json({ error: "El límite debe estar entre 1 y 1024 MB" }, 422);
+  }
+
+  const db     = createDb(c.env.DB);
+  const client = await getClient(db, user.id);
+  if (!client) return c.json({ error: "no hosting found" }, 404);
+  if (client.status !== "active") return c.json({ error: "Tu hosting está suspendido" }, 403);
+  if (!client.node) return c.json({ error: "El hosting no tiene node asignado" }, 409);
+
+  const project = await db.query.projects.findFirst({ where: eq(projects.id, c.req.param("id")) });
+  if (!project || project.clientId !== client.id) return c.json({ error: "not found" }, 404);
+
+  const agent = await agentFetch(client.node, `/projects/${project.id}/php-limits`, "POST", { upload_max_mb: mb });
+  if (!agent.ok) return c.json({ error: agent.error }, 502);
+
+  await db.update(projects).set({ uploadMaxMb: mb }).where(eq(projects.id, project.id));
+  return c.json({ ok: true, uploadMaxMb: mb });
+});
+
 // Renombrar el subdominio: recablea listeners en el agente, la app y los
 // archivos no se mueven (docPath queda como estaba).
 projectsRouter.patch("/:id/subdomain", async (c) => {

@@ -84,6 +84,8 @@ func main() {
 			r.Post("/{projectID}/install", handlers.InstallApp)
 			// Login 1-clic al admin de WordPress (token de un solo uso)
 			r.Post("/{projectID}/sso", handlers.ProjectSSO)
+			// Límites PHP de subida (upload_max_filesize/post_max_size)
+			r.Post("/{projectID}/php-limits", handlers.SetProjectPhpLimits)
 		})
 
 		// Bases de datos independientes del cliente
