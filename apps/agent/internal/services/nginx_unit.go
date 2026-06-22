@@ -118,32 +118,39 @@ func (NginxUnit) SetPhpUploadLimit(appKey string, uploadMB int) error {
 		return err
 	}
 
+	// Subir el max_body_size global de Unit. Se hace PUT del objeto settings/http
+	// COMPLETO (no del campo suelto): Unit no crea rutas profundas si falta el
+	// padre, y settings/http puede no existir aún (daría 404 "Value doesn't exist").
 	postBytes := int64(postMB) * 1024 * 1024
-	if cur := maxBodySize(); postBytes > cur {
-		if err := unitPut("/config/settings/http/max_body_size", postBytes); err != nil {
+	httpCfg := settingsHTTP()
+	cur, _ := httpCfg["max_body_size"].(float64) // los números JSON llegan como float64
+	if postBytes > int64(cur) {
+		httpCfg["max_body_size"] = postBytes
+		if err := unitPut("/config/settings/http", httpCfg); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// maxBodySize lee el límite global de cuerpo de Unit (bytes); 8 MiB si no está.
-func maxBodySize() int64 {
-	req, _ := http.NewRequest(http.MethodGet, unitSocket+"/config/settings/http/max_body_size", nil)
+// settingsHTTP lee /config/settings/http (vacío si no existe) para modificar
+// max_body_size sin perder otros ajustes.
+func settingsHTTP() map[string]any {
+	req, _ := http.NewRequest(http.MethodGet, unitSocket+"/config/settings/http", nil)
 	resp, err := unitClient.Do(req)
 	if err != nil {
-		return 8 * 1024 * 1024
+		return map[string]any{}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return 8 * 1024 * 1024
+		return map[string]any{}
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var n int64
-	if json.Unmarshal(body, &n) != nil {
-		return 8 * 1024 * 1024
+	var m map[string]any
+	if json.Unmarshal(body, &m) != nil || m == nil {
+		return map[string]any{}
 	}
-	return n
+	return m
 }
 
 // AppRoot expone appRoot para otros handlers (p. ej. SSO necesita el docroot).
