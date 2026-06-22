@@ -73,10 +73,9 @@ agentRouter.post("/heartbeat", async (c) => {
   const now = new Date();
 
   // El agente reporta la IP pública que ve internet. Si cambió (p. ej. el
-  // proveedor reasignó IP al recrear el VPS), la persistimos y reapuntamos el
-  // wildcard DNS *.pages/*.db a ella — así los proyectos y las BD siguen al node
-  // sin intervención manual.
-  const ipChanged = !!body.publicIp && body.publicIp !== node.ipPublic;
+  // proveedor reasignó IP al recrear el VPS), la persistimos.
+  const reportedIp = body.publicIp?.trim();
+  const ipChanged  = !!reportedIp && reportedIp !== node.ipPublic;
 
   // Actualizar último heartbeat del node. El agente reporta su URL pública
   // de tunnel (cloudflared); la persistimos para que el control plane pueda
@@ -85,11 +84,17 @@ agentRouter.post("/heartbeat", async (c) => {
     lastHeartbeatAt: now,
     status:          "ready",
     ...(body.agentUrl && body.agentUrl !== node.agentUrl ? { agentUrl: body.agentUrl } : {}),
-    ...(ipChanged ? { ipPublic: body.publicIp } : {}),
+    ...(ipChanged ? { ipPublic: reportedIp } : {}),
   }).where(eq(nodes.id, body.nodeId));
 
-  // Best-effort, fuera del camino de respuesta: reapuntar el DNS de infra.
-  if (ipChanged) c.executionCtx.waitUntil(syncInfraWildcards(c.env, body.publicIp!));
+  // Asegurar que el wildcard de infra (*.pages/*.db) apunta a la IP del node.
+  // Idempotente: el helper solo escribe en Cloudflare si la IP difiere, así que
+  // correrlo en cada heartbeat es barato (un GET) y auto-sana cualquier drift
+  // —incluido el caso de un registro que quedó obsoleto sin que la IP cambiara—.
+  // Best-effort y fuera del camino de respuesta vía waitUntil. (Modelo de un
+  // solo node activo; con muchos nodes habría que throttlear o repensar el DNS.)
+  const desiredIp = reportedIp || node.ipPublic;
+  if (desiredIp) c.executionCtx.waitUntil(syncInfraWildcards(c.env, desiredIp));
 
   // Guardar métricas del node
   await db.insert(nodeMetrics).values({
