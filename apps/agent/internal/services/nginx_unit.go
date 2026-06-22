@@ -65,12 +65,19 @@ func (NginxUnit) UpdateLimits(user string, memoryMB, maxProcs int) error {
 // "*:80" que pasa a /config/routes, y cada host es un step con match.host.
 
 func (NginxUnit) CreateProjectApp(appKey, user, docRoot string, memoryMB, maxProcs int) error {
+	// Dos targets: `direct` ejecuta el .php pedido tal cual (wp-login.php,
+	// wp-admin/index.php); `index` enruta todo a index.php (permalinks bonitos).
+	// El ruteo (SetHostRoute) sirve estáticos con `share` y manda los .php a
+	// `direct` y el resto a `index`. Sin esto Unit mandaba TODO a index.php y
+	// los .php directos y los assets daban 404.
 	app := map[string]any{
-		"type":   "php",
-		"user":   user,
-		"group":  user,
-		"root":   docRoot,
-		"script": "index.php",
+		"type":  "php",
+		"user":  user,
+		"group": user,
+		"targets": map[string]any{
+			"direct": map[string]any{"root": docRoot},
+			"index":  map[string]any{"root": docRoot, "script": "index.php"},
+		},
 		"options": map[string]any{
 			"admin": map[string]string{
 				"memory_limit": fmt.Sprintf("%dM", memoryMB),
@@ -85,6 +92,33 @@ func (NginxUnit) CreateProjectApp(appKey, user, docRoot string, memoryMB, maxPro
 	return unitPut("/config/applications/"+appKey, app)
 }
 
+// appRoot lee el docroot configurado de una app (target index) — así SetHostRoute
+// puede construir el `share` de estáticos sin recibir el docRoot por parámetro.
+func appRoot(appKey string) (string, error) {
+	req, _ := http.NewRequest(http.MethodGet, unitSocket+"/config/applications/"+appKey, nil)
+	resp, err := unitClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("unit GET app %s: %w", appKey, err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var app struct {
+		Root    string `json:"root"`
+		Targets struct {
+			Index struct {
+				Root string `json:"root"`
+			} `json:"index"`
+		} `json:"targets"`
+	}
+	if err := json.Unmarshal(body, &app); err != nil {
+		return "", fmt.Errorf("unit app %s no parseable: %w", appKey, err)
+	}
+	if app.Targets.Index.Root != "" {
+		return app.Targets.Index.Root, nil
+	}
+	return app.Root, nil
+}
+
 // Las mutaciones de routes son read-modify-write sobre el array completo —
 // serializar para no perder steps en llamadas concurrentes.
 var routesMu sync.Mutex
@@ -92,6 +126,11 @@ var routesMu sync.Mutex
 // SetHostRoute hace que el hostname dado sirva la app indicada (reemplaza el
 // step previo del mismo host si existía) y garantiza el listener "*:80".
 func (NginxUnit) SetHostRoute(host, appKey string) error {
+	root, err := appRoot(appKey)
+	if err != nil {
+		return err
+	}
+
 	routesMu.Lock()
 	defer routesMu.Unlock()
 
@@ -100,10 +139,21 @@ func (NginxUnit) SetHostRoute(host, appKey string) error {
 		return err
 	}
 	routes = removeHostStep(routes, host)
-	step := map[string]any{
-		"match":  map[string]any{"host": host},
-		"action": map[string]any{"pass": "applications/" + appKey},
+
+	// Dos steps por host: (1) los .php y /wp-admin/ se ejecutan directo; (2) el
+	// resto sirve el archivo estático si existe (`share`) y si no, cae a index.php.
+	phpStep := map[string]any{
+		"match":  map[string]any{"host": host, "uri": []string{"*.php", "*.php/*", "/wp-admin/"}},
+		"action": map[string]any{"pass": "applications/" + appKey + "/direct"},
 	}
+	shareStep := map[string]any{
+		"match": map[string]any{"host": host},
+		"action": map[string]any{
+			"share":    root + "$uri",
+			"fallback": map[string]any{"pass": "applications/" + appKey + "/index"},
+		},
+	}
+
 	// Antes de un eventual catch-all del final, pero después de los steps
 	// con match.scheme (el redirect http→https debe evaluarse primero).
 	idx := 0
@@ -121,7 +171,7 @@ func (NginxUnit) SetHostRoute(host, appKey string) error {
 		}
 		idx++
 	}
-	routes = append(routes[:idx], append([]any{step}, routes[idx:]...)...)
+	routes = append(routes[:idx], append([]any{phpStep, shareStep}, routes[idx:]...)...)
 
 	if err := putRoutes(routes); err != nil {
 		return err
@@ -151,23 +201,15 @@ func (NginxUnit) RemoveListener(user, domain string) error {
 }
 
 func ensureVhostListener() error {
-	return unitPut("/config/listeners/*:80", map[string]any{
-		"pass": "routes",
-		// El agente termina TLS en :443 y hace proxy a este :80 enviando
-		// X-Forwarded-Proto. Confiamos en ese header (solo desde localhost) para
-		// que Unit marque el request como https → PHP is_ssl()/$_SERVER['HTTPS']
-		// correctos. Sin esto WordPress entra en bucle de redirects en /wp-admin.
-		"forwarded": map[string]any{
-			"protocol": "X-Forwarded-Proto",
-			"source":   []string{"127.0.0.1", "::1"},
-		},
-	})
+	// Sin `forwarded`: Unit `forwarded.protocol` sólo ajusta REQUEST_SCHEME, no
+	// $_SERVER['HTTPS'] (que es lo que mira WordPress is_ssl()). Por eso dejamos
+	// que Unit pase X-Forwarded-Proto tal cual (HTTP_X_FORWARDED_PROTO) y un
+	// snippet en wp-config lo promueve a HTTPS=on. Ver installer.EnsureWpConfigSSL.
+	return unitPut("/config/listeners/*:80", map[string]any{"pass": "routes"})
 }
 
-// EnsureBaseListener reaplica la config del listener *:80 (incluido `forwarded`).
-// Se llama al arrancar el agente para que los nodes ya existentes adopten la
-// confianza en X-Forwarded-Proto tras una actualización, sin esperar a que se
-// cree o renombre un proyecto.
+// EnsureBaseListener reaplica la config del listener *:80. Se llama al arrancar
+// el agente para normalizar la config en nodes ya existentes tras actualizar.
 func (NginxUnit) EnsureBaseListener() error {
 	return ensureVhostListener()
 }

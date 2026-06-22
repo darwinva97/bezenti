@@ -1,11 +1,70 @@
 package services
 
 import (
+	"bytes"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
+
+// wpSSLSnippet va dentro de wp-config.php. El proxy TLS del nodo reenvía el
+// esquema en X-Forwarded-Proto; Unit además expone REQUEST_SCHEME. WordPress
+// is_ssl() sólo mira $_SERVER['HTTPS'], así que lo derivamos aquí. El comentario
+// final "Bezenti SSL forwarded" sirve de marcador de idempotencia.
+const wpSSLSnippet = `if ( ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && 'https' === $_SERVER['HTTP_X_FORWARDED_PROTO'] ) || ( isset( $_SERVER['REQUEST_SCHEME'] ) && 'https' === $_SERVER['REQUEST_SCHEME'] ) ) { $_SERVER['HTTPS'] = 'on'; } /* Bezenti SSL forwarded */`
+
+const wpSSLMarker = "Bezenti SSL forwarded"
+
+// EnsureWpConfigSSL inserta wpSSLSnippet en un wp-config.php si falta. Idempotente.
+// Devuelve true si lo modificó.
+func EnsureWpConfigSSL(path string) (bool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	if bytes.Contains(data, []byte(wpSSLMarker)) {
+		return false, nil
+	}
+	s := string(data)
+	idx := strings.Index(s, "<?php")
+	if idx < 0 {
+		return false, nil // no parece PHP; no tocar
+	}
+	insertAt := idx + len("<?php")
+	if nl := strings.IndexByte(s[insertAt:], '\n'); nl >= 0 {
+		insertAt += nl + 1
+	}
+	block := "\n/* Bezenti: detectar https reenviado por el proxy TLS del nodo. */\n" + wpSSLSnippet + "\n"
+	out := s[:insertAt] + block + s[insertAt:]
+	// WriteFile sobre un archivo existente conserva dueño y permisos (sólo
+	// trunca y reescribe); el agente corre como root y puede escribirlo.
+	if err := os.WriteFile(path, []byte(out), 0o644); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// RepairWpConfigsSSL recorre los wp-config.php de los proyectos y les añade el
+// snippet de https si falta. Best-effort; se llama al arrancar el agente para
+// curar instalaciones hechas antes de este fix.
+func RepairWpConfigsSSL() {
+	for _, pat := range []string{
+		"/var/www/*/*/public/wp-config.php",
+		"/var/www/*/public/wp-config.php",
+	} {
+		matches, _ := filepath.Glob(pat)
+		for _, p := range matches {
+			if changed, err := EnsureWpConfigSSL(p); err != nil {
+				slog.Warn("repair wp-config ssl", "path", p, "err", err)
+			} else if changed {
+				slog.Info("wp-config ssl reparado", "path", p)
+			}
+		}
+	}
+}
 
 // Installer instala aplicaciones PHP "1-clic" (tipo Softaculous) en el docroot
 // de un proyecto. Hoy soporta WordPress; el diseño es extensible a otras apps.
@@ -82,14 +141,16 @@ func (Installer) InstallWordPress(o WordPressOpts) error {
 	if err := wp("core", "download", "--locale="+locale); err != nil {
 		return err
 	}
-	if err := wp("config", "create",
-		"--dbname="+o.DBName,
-		"--dbuser="+o.DBUser,
-		"--dbpass="+o.DBPassword,
-		"--dbhost=localhost",
-		"--skip-check",
-	); err != nil {
-		return err
+	// config create con --extra-php: inyecta el snippet de detección de https
+	// (lee de stdin). Así el wp-config nace listo para servir tras el proxy TLS.
+	{
+		cmd := exec.Command(wpCliPath, "--path="+docRoot, "--allow-root", "config", "create",
+			"--dbname="+o.DBName, "--dbuser="+o.DBUser, "--dbpass="+o.DBPassword,
+			"--dbhost=localhost", "--skip-check", "--extra-php")
+		cmd.Stdin = strings.NewReader(wpSSLSnippet + "\n")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("wp config create: %s", strings.TrimSpace(string(out)))
+		}
 	}
 	if err := wp("core", "install",
 		"--url="+o.SiteURL,

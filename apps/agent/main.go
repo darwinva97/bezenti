@@ -121,6 +121,10 @@ func main() {
 		slog.Warn("no se pudo reaplicar el listener base de Unit", "err", err)
 	}
 
+	// Curar wp-config.php de instalaciones previas para que detecten https
+	// reenviado por el proxy TLS (evita el bucle de redirects en wp-admin).
+	services.RepairWpConfigsSSL()
+
 	// Heartbeat goroutine: informa al control plane que este nodo está vivo.
 	go heartbeatLoop(controlPlaneURL, nodeID, token)
 
