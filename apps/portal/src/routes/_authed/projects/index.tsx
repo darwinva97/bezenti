@@ -308,6 +308,25 @@ function ProjectsTable({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [installing, setInstalling] = useState<Project | null>(null);
+  const [ssoBusy, setSsoBusy] = useState<string | null>(null);
+
+  async function wpLogin(p: Project) {
+    setSsoBusy(p.id);
+    setError(null);
+    // Abrir la pestaña YA (gesto del usuario) para que el navegador no la
+    // bloquee; luego la redirigimos a la URL mágica cuando llega.
+    const tab = window.open("about:blank", "_blank", "noopener");
+    try {
+      const { url } = await api<{ url: string }>(`/portal/projects/${p.id}/wp-login`, { method: "POST" });
+      if (tab) tab.location.href = url;
+      else window.location.href = url;
+    } catch (err) {
+      tab?.close();
+      setError(err instanceof Error ? err.message : "No se pudo abrir WordPress");
+    } finally {
+      setSsoBusy(null);
+    }
+  }
 
   async function rename(id: string) {
     setBusy(id);
@@ -394,16 +413,17 @@ function ProjectsTable({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  {p.appType ? (
-                    <a
-                      href={`${p.status === "active" ? "https" : "http"}://${p.domain}/wp-admin`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 hover:bg-blue-100"
-                      title="Abrir el panel de administración"
+                  {p.appType === "wordpress" ? (
+                    <button
+                      onClick={() => wpLogin(p)}
+                      disabled={ssoBusy === p.id}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 hover:bg-blue-100 disabled:opacity-50"
+                      title="Entrar al admin de WordPress sin contraseña"
                     >
-                      {p.appType === "wordpress" ? "WordPress" : p.appType} ↗
-                    </a>
+                      {ssoBusy === p.id ? "Abriendo…" : "Entrar a WordPress ↗"}
+                    </button>
+                  ) : p.appType ? (
+                    <span className="text-xs font-medium text-gray-600">{p.appType}</span>
                   ) : (
                     <button
                       onClick={() => setInstalling(p)}

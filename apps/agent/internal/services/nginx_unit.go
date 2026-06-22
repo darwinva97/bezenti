@@ -92,6 +92,9 @@ func (NginxUnit) CreateProjectApp(appKey, user, docRoot string, memoryMB, maxPro
 	return unitPut("/config/applications/"+appKey, app)
 }
 
+// AppRoot expone appRoot para otros handlers (p. ej. SSO necesita el docroot).
+func (NginxUnit) AppRoot(appKey string) (string, error) { return appRoot(appKey) }
+
 // appRoot lee el docroot configurado de una app (target index) — así SetHostRoute
 // puede construir el `share` de estáticos sin recibir el docRoot por parámetro.
 func appRoot(appKey string) (string, error) {

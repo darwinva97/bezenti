@@ -63,6 +63,25 @@ func CreateProject(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{"app": appKey, "doc_root": docRoot})
 }
 
+// ProjectSSO genera un token de login 1-clic para el WordPress del proyecto.
+// El control plane (ya autenticado) lo llama; devuelve { token } y arma la URL.
+func ProjectSSO(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "projectID")
+
+	root, err := (services.NginxUnit{}).AppRoot(projectAppKey(projectID))
+	if err != nil {
+		http.Error(w, "proyecto no encontrado en el nodo: "+err.Error(), http.StatusNotFound)
+		return
+	}
+	token, err := services.Installer{}.GenerateSSOToken(root)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"token": token})
+}
+
 // DeleteProject quita listeners y la app de Unit. Conserva los archivos del
 // docroot — el borrado de datos del cliente es decisión aparte.
 func DeleteProject(w http.ResponseWriter, r *http.Request) {
