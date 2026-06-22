@@ -25,6 +25,8 @@ accountRouter.get("/", async (c) => {
     sftpHost:    client.node?.ipPublic ?? null,
     sftpUser:    client.linuxUser,
     plan:        client.plan ? { id: client.plan.id, name: client.plan.name } : null,
+    // Tope de memoria PHP que el cliente puede asignar a un proyecto (= su plan).
+    phpMemoryMaxMb: client.plan?.phpMemoryLimitMb ?? 256,
   });
 });
 

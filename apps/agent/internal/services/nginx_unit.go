@@ -83,7 +83,9 @@ func (NginxUnit) CreateProjectApp(appKey, user, docRoot string, memoryMB, maxPro
 				"memory_limit":        fmt.Sprintf("%dM", memoryMB),
 				"upload_max_filesize": fmt.Sprintf("%dM", DefaultUploadMaxMB),
 				"post_max_size":       fmt.Sprintf("%dM", DefaultUploadMaxMB+16),
-				"max_execution_time":  "300",
+				"max_execution_time":  fmt.Sprintf("%d", DefaultMaxExecutionTime),
+				"max_input_vars":      fmt.Sprintf("%d", DefaultMaxInputVars),
+				"max_input_time":      fmt.Sprintf("%d", DefaultMaxInputTime),
 			},
 		},
 		"processes": map[string]any{
@@ -95,45 +97,78 @@ func (NginxUnit) CreateProjectApp(appKey, user, docRoot string, memoryMB, maxPro
 	return unitPut("/config/applications/"+appKey, app)
 }
 
-// DefaultUploadMaxMB es el límite de subida por defecto de un proyecto (MB).
-const DefaultUploadMaxMB = 64
+// Defaults de ajustes PHP de un proyecto.
+const (
+	DefaultUploadMaxMB      = 64
+	DefaultMaxExecutionTime = 300
+	DefaultMaxInputVars     = 1000
+	DefaultMaxInputTime     = 300
+)
 
-// SetPhpUploadLimit ajusta el límite de subida de un proyecto: upload_max_filesize
-// y post_max_size en la app, y sube el max_body_size global de Unit si hace falta
-// (de lo contrario Unit corta el cuerpo de la petición antes de llegar a PHP).
-// Nunca baja el límite global (otros proyectos podrían necesitarlo más alto).
-func (NginxUnit) SetPhpUploadLimit(appKey string, uploadMB int) error {
-	if uploadMB < 1 {
-		uploadMB = 1
-	}
-	postMB := uploadMB + 16
+// PhpSettings son los ajustes php.ini configurables por proyecto. Un campo en 0
+// se ignora (se conserva lo que haya).
+type PhpSettings struct {
+	UploadMaxMB      int `json:"upload_max_mb"`
+	MaxExecutionTime int `json:"max_execution_time"`
+	MemoryLimitMB    int `json:"memory_limit_mb"`
+	MaxInputVars     int `json:"max_input_vars"`
+	MaxInputTime     int `json:"max_input_time"`
+}
+
+// SetPhpSettings aplica ajustes php.ini a la app de Unit del proyecto y, para la
+// subida, también sube el max_body_size global de Unit (si no, Unit corta el
+// cuerpo antes de llegar a PHP). Nunca baja el límite global (otros proyectos
+// podrían necesitarlo más alto). Los validaciones de rango van en el control plane.
+func (NginxUnit) SetPhpSettings(appKey string, s PhpSettings) error {
 	base := "/config/applications/" + appKey + "/options/admin/"
-	if err := unitPut(base+"upload_max_filesize", fmt.Sprintf("%dM", uploadMB)); err != nil {
-		return err
-	}
-	if err := unitPut(base+"post_max_size", fmt.Sprintf("%dM", postMB)); err != nil {
-		return err
-	}
-	if err := unitPut(base+"max_execution_time", "300"); err != nil {
-		return err
-	}
+	put := func(k, v string) error { return unitPut(base+k, v) }
 
-	// Subir el max_body_size global de Unit. Hay que hacer PUT del objeto
-	// /config/settings COMPLETO: Unit no crea rutas si falta el padre, y por
-	// defecto ni `settings` ni `settings/http` existen (PUT a un hijo daría 404
-	// "Value doesn't exist"). `/config` siempre existe, así que PUT ahí con merge.
-	postBytes := int64(postMB) * 1024 * 1024
-	settings := getConfig("/config/settings")
-	httpCfg, _ := settings["http"].(map[string]any)
-	if httpCfg == nil {
-		httpCfg = map[string]any{}
-	}
-	cur, _ := httpCfg["max_body_size"].(float64) // los números JSON llegan como float64
-	if postBytes > int64(cur) {
-		httpCfg["max_body_size"] = postBytes
-		settings["http"] = httpCfg
-		if err := unitPut("/config/settings", settings); err != nil {
+	if s.MemoryLimitMB > 0 {
+		if err := put("memory_limit", fmt.Sprintf("%dM", s.MemoryLimitMB)); err != nil {
 			return err
+		}
+	}
+	if s.MaxExecutionTime > 0 {
+		if err := put("max_execution_time", fmt.Sprintf("%d", s.MaxExecutionTime)); err != nil {
+			return err
+		}
+	}
+	if s.MaxInputTime > 0 {
+		if err := put("max_input_time", fmt.Sprintf("%d", s.MaxInputTime)); err != nil {
+			return err
+		}
+	}
+	if s.MaxInputVars > 0 {
+		if err := put("max_input_vars", fmt.Sprintf("%d", s.MaxInputVars)); err != nil {
+			return err
+		}
+	}
+	if s.UploadMaxMB > 0 {
+		postMB := s.UploadMaxMB + 16
+		if err := put("upload_max_filesize", fmt.Sprintf("%dM", s.UploadMaxMB)); err != nil {
+			return err
+		}
+		if err := put("post_max_size", fmt.Sprintf("%dM", postMB)); err != nil {
+			return err
+		}
+
+		// Subir el max_body_size global de Unit. PUT del objeto /config/settings
+		// COMPLETO: Unit no crea rutas si falta el padre, y por defecto ni
+		// `settings` ni `settings/http` existen (PUT a un hijo daría 404). `/config`
+		// siempre existe, así que PUT ahí con merge.
+		postBytes := int64(postMB) * 1024 * 1024
+		settings := getConfig("/config/settings")
+		httpCfg, _ := settings["http"].(map[string]any)
+		if httpCfg == nil {
+			httpCfg = map[string]any{}
+		}
+		cur, _ := httpCfg["max_body_size"].(float64) // los números JSON llegan como float64
+		if postBytes > int64(cur) {
+			httpCfg["max_body_size"] = postBytes
+			settings["http"] = httpCfg
+			if err := unitPut("/config/settings", settings); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

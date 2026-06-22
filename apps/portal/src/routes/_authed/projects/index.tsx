@@ -17,9 +17,35 @@ type Project = {
   status: string;
   appType: string | null;
   uploadMaxMb: number | null;
+  phpSettings: string | null;
 };
 
-const DEFAULT_UPLOAD_MB = 64;
+type PhpSettings = {
+  uploadMaxMb: number;
+  maxExecutionTime: number;
+  memoryLimitMb: number;
+  maxInputVars: number;
+  maxInputTime: number;
+};
+
+function parsePhp(json: string | null, memDefault: number): PhpSettings {
+  const d: PhpSettings = {
+    uploadMaxMb: 64, maxExecutionTime: 300, memoryLimitMb: memDefault, maxInputVars: 1000, maxInputTime: 300,
+  };
+  if (!json) return d;
+  try {
+    const p = JSON.parse(json) as Partial<PhpSettings>;
+    return {
+      uploadMaxMb:      Number(p.uploadMaxMb)      || d.uploadMaxMb,
+      maxExecutionTime: Number(p.maxExecutionTime) || d.maxExecutionTime,
+      memoryLimitMb:    Number(p.memoryLimitMb)    || d.memoryLimitMb,
+      maxInputVars:     Number(p.maxInputVars)     || d.maxInputVars,
+      maxInputTime:     Number(p.maxInputTime)     || d.maxInputTime,
+    };
+  } catch {
+    return d;
+  }
+}
 
 type InstallResult = {
   adminUrl: string;
@@ -32,6 +58,7 @@ type Account = {
   accountSlug: string;
   pagesDomain: string;
   dbHost: string | null;
+  phpMemoryMaxMb: number;
 };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -455,9 +482,9 @@ function ProjectsTable({
                       <button
                         onClick={() => setUploadProj(p)}
                         className="text-sm text-gray-600 hover:text-gray-800 mr-3"
-                        title="Tamaño máximo de subida (plugins, temas, medios)"
+                        title="Ajustes PHP: subida, memoria, tiempo de ejecución…"
                       >
-                        Subidas
+                        Ajustes PHP
                       </button>
                       <button
                         onClick={() => remove(p)}
@@ -484,8 +511,9 @@ function ProjectsTable({
       )}
 
       {uploadProj && (
-        <UploadLimitModal
+        <PhpSettingsModal
           project={uploadProj}
+          memoryMaxMb={account.phpMemoryMaxMb}
           onClose={() => setUploadProj(null)}
           onSaved={() => { setUploadProj(null); onChanged(); }}
         />
@@ -494,34 +522,56 @@ function ProjectsTable({
   );
 }
 
-// Configurar el tamaño máximo de subida del proyecto (estilo php.ini).
-function UploadLimitModal({
+// Configurar los ajustes PHP del proyecto (estilo php.ini).
+function PhpSettingsModal({
   project,
+  memoryMaxMb,
   onClose,
   onSaved,
 }: {
   project: Project;
+  memoryMaxMb: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const current = project.uploadMaxMb ?? DEFAULT_UPLOAD_MB;
-  const [value, setValue] = useState(String(current));
+  const cur = parsePhp(project.phpSettings, memoryMaxMb);
+  const [form, setForm] = useState<Record<keyof PhpSettings, string>>({
+    uploadMaxMb: String(cur.uploadMaxMb),
+    maxExecutionTime: String(cur.maxExecutionTime),
+    memoryLimitMb: String(cur.memoryLimitMb),
+    maxInputVars: String(cur.maxInputVars),
+    maxInputTime: String(cur.maxInputTime),
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const memMax = Math.max(64, memoryMaxMb);
+  const rows: { key: keyof PhpSettings; label: string; unit: string; min: number; max: number; presets: number[]; help?: string }[] = [
+    { key: "uploadMaxMb",      label: "Tamaño máximo de subida", unit: "MB", min: 1,    max: 1024,   presets: [64, 128, 256, 512] },
+    { key: "memoryLimitMb",    label: "Memoria PHP",             unit: "MB", min: 64,   max: memMax, presets: [128, 256, 512].filter((n) => n <= memMax), help: `Máximo de tu plan: ${memMax} MB` },
+    { key: "maxExecutionTime", label: "Tiempo de ejecución",     unit: "s",  min: 5,    max: 600,    presets: [30, 120, 300, 600] },
+    { key: "maxInputTime",     label: "Tiempo máx. de entrada",  unit: "s",  min: 5,    max: 600,    presets: [60, 300, 600] },
+    { key: "maxInputVars",     label: "Máx. variables de entrada", unit: "",  min: 1000, max: 10000,  presets: [1000, 3000, 5000, 10000], help: "Súbelo si se guardan incompletos menús/ACF/formularios" },
+  ];
+
+  function setField(key: keyof PhpSettings, v: string) {
+    setForm((f) => ({ ...f, [key]: v }));
+  }
+
   async function save() {
-    const mb = Math.floor(Number(value));
-    if (!Number.isFinite(mb) || mb < 1 || mb > 1024) {
-      setError("Ingresa un número entre 1 y 1024 MB");
-      return;
+    const payload: Record<string, number> = {};
+    for (const r of rows) {
+      const v = Math.floor(Number(form[r.key]));
+      if (!Number.isFinite(v) || v < r.min || v > r.max) {
+        setError(`${r.label}: entre ${r.min} y ${r.max} ${r.unit}`.trim());
+        return;
+      }
+      payload[r.key] = v;
     }
     setSaving(true);
     setError(null);
     try {
-      await api(`/portal/projects/${project.id}/php-limits`, {
-        method: "POST",
-        body: JSON.stringify({ uploadMaxMb: mb }),
-      });
+      await api(`/portal/projects/${project.id}/php-limits`, { method: "POST", body: JSON.stringify(payload) });
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar");
@@ -532,53 +582,57 @@ function UploadLimitModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Tamaño máximo de subida</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Ajustes PHP</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-5">
           <p className="text-sm text-gray-500">
-            Límite para subir plugins, temas y archivos en{" "}
+            Configuración PHP de{" "}
             <code className="font-mono text-xs text-gray-800">{project.domain}</code>. Aplica de
             inmediato, sin reiniciar.
           </p>
           {error && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
           )}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Límite (MB)</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={1024}
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-500">MB (máx. 1024)</span>
+          {rows.map((r) => (
+            <div key={r.key}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {r.label} {r.unit && <span className="text-gray-400 font-normal">({r.unit})</span>}
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={r.min}
+                  max={r.max}
+                  value={form[r.key]}
+                  onChange={(e) => setField(r.key, e.target.value)}
+                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {r.presets.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setField(r.key, String(n))}
+                      className="text-xs px-2 py-1 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50"
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {r.help && <p className="mt-1 text-xs text-gray-400">{r.help}</p>}
             </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {[64, 128, 256, 512].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setValue(String(n))}
-                  className="text-xs px-2 py-1 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50"
-                >
-                  {n} MB
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex gap-2">
+          ))}
+          <div className="flex gap-2 pt-1">
             <button
               onClick={save}
               disabled={saving}
               className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              {saving ? "Guardando…" : "Guardar"}
+              {saving ? "Guardando…" : "Guardar ajustes"}
             </button>
             <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700 px-2">
               Cancelar

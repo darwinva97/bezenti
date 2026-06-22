@@ -17,14 +17,35 @@ func projectAppKey(projectID string) string {
 }
 
 type createProjectReq struct {
-	ID            string   `json:"id"`
-	LinuxUser     string   `json:"linux_user"`
-	DocPath       string   `json:"doc_path"`
-	PhpVersion    string   `json:"php_version"`
-	MemoryLimitMB int      `json:"memory_limit_mb"`
-	MaxProcesses  int      `json:"max_processes"`
-	UploadMaxMB   int      `json:"upload_max_mb"`
-	Hosts         []string `json:"hosts"`
+	ID            string               `json:"id"`
+	LinuxUser     string               `json:"linux_user"`
+	DocPath       string               `json:"doc_path"`
+	PhpVersion    string               `json:"php_version"`
+	MemoryLimitMB int                  `json:"memory_limit_mb"`
+	MaxProcesses  int                  `json:"max_processes"`
+	PhpSettings   services.PhpSettings `json:"php_settings"`
+	Hosts         []string             `json:"hosts"`
+}
+
+// withDefaults completa los campos en 0 de unos ajustes PHP con los defaults del
+// nodo (la memoria por defecto = la del plan, que llega aparte en el create).
+func phpSettingsWithDefaults(s services.PhpSettings, memDefault int) services.PhpSettings {
+	if s.MemoryLimitMB <= 0 {
+		s.MemoryLimitMB = memDefault
+	}
+	if s.UploadMaxMB <= 0 {
+		s.UploadMaxMB = services.DefaultUploadMaxMB
+	}
+	if s.MaxExecutionTime <= 0 {
+		s.MaxExecutionTime = services.DefaultMaxExecutionTime
+	}
+	if s.MaxInputVars <= 0 {
+		s.MaxInputVars = services.DefaultMaxInputVars
+	}
+	if s.MaxInputTime <= 0 {
+		s.MaxInputTime = services.DefaultMaxInputTime
+	}
+	return s
 }
 
 func CreateProject(w http.ResponseWriter, r *http.Request) {
@@ -59,13 +80,10 @@ func CreateProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Aplicar el límite de subida (persistido en el control plane) — así una
-	// re-provisión conserva lo que el cliente haya configurado.
-	uploadMB := req.UploadMaxMB
-	if uploadMB < 1 {
-		uploadMB = services.DefaultUploadMaxMB
-	}
-	if err := unit.SetPhpUploadLimit(appKey, uploadMB); err != nil {
+	// Aplicar los ajustes PHP (persistidos en el control plane) — así una
+	// re-provisión conserva lo que el cliente haya configurado. Sube además el
+	// max_body_size global de Unit para la subida.
+	if err := unit.SetPhpSettings(appKey, phpSettingsWithDefaults(req.PhpSettings, req.MemoryLimitMB)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -75,22 +93,17 @@ func CreateProject(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{"app": appKey, "doc_root": docRoot})
 }
 
-// SetProjectPhpLimits ajusta los límites PHP de subida del proyecto (lo llama
-// el control plane cuando el cliente cambia el límite desde el panel).
+// SetProjectPhpLimits aplica los ajustes PHP del proyecto (lo llama el control
+// plane cuando el cliente los cambia desde el panel). Las validaciones de rango
+// y el tope de memoria según el plan se hacen en el control plane.
 func SetProjectPhpLimits(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "projectID")
-	var req struct {
-		UploadMaxMB int `json:"upload_max_mb"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var s services.PhpSettings
+	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if req.UploadMaxMB < 1 || req.UploadMaxMB > 1024 {
-		http.Error(w, "upload_max_mb fuera de rango (1–1024)", http.StatusBadRequest)
-		return
-	}
-	if err := (services.NginxUnit{}).SetPhpUploadLimit(projectAppKey(projectID), req.UploadMaxMB); err != nil {
+	if err := (services.NginxUnit{}).SetPhpSettings(projectAppKey(projectID), s); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

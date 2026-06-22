@@ -302,16 +302,40 @@ projectsRouter.post("/:id/wp-login", async (c) => {
   return c.json({ url: `${scheme}://${project.domain}/?bezenti_sso=${encodeURIComponent(token)}` });
 });
 
-// Configurar el límite de subida del proyecto (upload_max_filesize, estilo
-// php.ini) — el cliente lo sube para instalar plugins/temas grandes. 1–1024 MB.
+type PhpSettings = Record<
+  "uploadMaxMb" | "maxExecutionTime" | "memoryLimitMb" | "maxInputVars" | "maxInputTime",
+  number
+>;
+
+// Lee el JSON de ajustes PHP guardado (o defaults del nodo). memDefault = memoria
+// del plan, que es el default cuando el proyecto no tiene un valor propio.
+function parsePhpSettings(json: string | null, memDefault: number): PhpSettings {
+  const d: PhpSettings = {
+    uploadMaxMb: 64, maxExecutionTime: 300, memoryLimitMb: memDefault, maxInputVars: 1000, maxInputTime: 300,
+  };
+  if (!json) return d;
+  try {
+    const p = JSON.parse(json) as Partial<PhpSettings>;
+    return {
+      uploadMaxMb:      Number(p.uploadMaxMb)      || d.uploadMaxMb,
+      maxExecutionTime: Number(p.maxExecutionTime) || d.maxExecutionTime,
+      memoryLimitMb:    Number(p.memoryLimitMb)    || d.memoryLimitMb,
+      maxInputVars:     Number(p.maxInputVars)     || d.maxInputVars,
+      maxInputTime:     Number(p.maxInputTime)     || d.maxInputTime,
+    };
+  } catch {
+    return d;
+  }
+}
+
+// Ajustes PHP del proyecto (estilo php.ini), configurables por el cliente:
+// subida, tiempo de ejecución, memoria, max_input_vars, max_input_time.
+// memoria se topa al límite del plan; el resto a rangos seguros.
 projectsRouter.post("/:id/php-limits", async (c) => {
   const user = c.get("user");
-  const { uploadMaxMb } = await c.req.json<{ uploadMaxMb?: number }>().catch(() => ({ uploadMaxMb: undefined }));
-
-  const mb = Math.floor(Number(uploadMaxMb));
-  if (!Number.isFinite(mb) || mb < 1 || mb > 1024) {
-    return c.json({ error: "El límite debe estar entre 1 y 1024 MB" }, 422);
-  }
+  const body = await c.req.json<Partial<Record<
+    "uploadMaxMb" | "maxExecutionTime" | "memoryLimitMb" | "maxInputVars" | "maxInputTime", number
+  >>>().catch(() => ({}));
 
   const db     = createDb(c.env.DB);
   const client = await getClient(db, user.id);
@@ -322,11 +346,42 @@ projectsRouter.post("/:id/php-limits", async (c) => {
   const project = await db.query.projects.findFirst({ where: eq(projects.id, c.req.param("id")) });
   if (!project || project.clientId !== client.id) return c.json({ error: "not found" }, 404);
 
-  const agent = await agentFetch(client.node, `/projects/${project.id}/php-limits`, "POST", { upload_max_mb: mb });
+  const plan      = client.plan ?? (await db.query.plans.findFirst({ where: eq(plans.id, client.planId) }));
+  const memCap    = Math.max(64, plan?.phpMemoryLimitMb ?? 256);
+  const cur       = parsePhpSettings(project.phpSettings, plan?.phpMemoryLimitMb ?? 128);
+
+  // Cada ajuste: usa el valor enviado o conserva el actual; valida rango.
+  const fields = [
+    { key: "uploadMaxMb",      min: 1,    max: 1024,   label: "Tamaño de subida (MB)" },
+    { key: "maxExecutionTime", min: 5,    max: 600,    label: "Tiempo de ejecución (s)" },
+    { key: "memoryLimitMb",    min: 64,   max: memCap, label: "Memoria PHP (MB)" },
+    { key: "maxInputVars",     min: 1000, max: 10000,  label: "Máx. variables de entrada" },
+    { key: "maxInputTime",     min: 5,    max: 600,    label: "Tiempo máx. de entrada (s)" },
+  ] as const;
+
+  const settings: Record<string, number> = {};
+  for (const f of fields) {
+    const raw = body[f.key];
+    const v   = raw === undefined ? cur[f.key] : Math.floor(Number(raw));
+    if (!Number.isFinite(v) || v < f.min || v > f.max) {
+      return c.json({ error: `${f.label}: debe estar entre ${f.min} y ${f.max}` }, 422);
+    }
+    settings[f.key] = v;
+  }
+
+  const agent = await agentFetch(client.node, `/projects/${project.id}/php-limits`, "POST", {
+    upload_max_mb:      settings["uploadMaxMb"],
+    max_execution_time: settings["maxExecutionTime"],
+    memory_limit_mb:    settings["memoryLimitMb"],
+    max_input_vars:     settings["maxInputVars"],
+    max_input_time:     settings["maxInputTime"],
+  });
   if (!agent.ok) return c.json({ error: agent.error }, 502);
 
-  await db.update(projects).set({ uploadMaxMb: mb }).where(eq(projects.id, project.id));
-  return c.json({ ok: true, uploadMaxMb: mb });
+  await db.update(projects)
+    .set({ phpSettings: JSON.stringify(settings), uploadMaxMb: settings["uploadMaxMb"] })
+    .where(eq(projects.id, project.id));
+  return c.json({ ok: true, settings });
 });
 
 // Renombrar el subdominio: recablea listeners en el agente, la app y los

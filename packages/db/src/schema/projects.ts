@@ -18,9 +18,12 @@ export const projects = sqliteTable("projects", {
   appType:     text("app_type"),
   // Ruta relativa dentro del home del cliente, ej: "blog" → /var/www/cli_xxx/blog/public
   docPath:     text("doc_path").notNull(),
-  // Límite de subida en MB (upload_max_filesize). null = default del nodo (64).
-  // Lo configura el cliente desde el panel para subir plugins/temas grandes.
+  // Límite de subida en MB (upload_max_filesize). Legacy: ahora se usa phpSettings.
   uploadMaxMb: integer("upload_max_mb"),
+  // Ajustes PHP del proyecto (JSON), configurables por el cliente desde el panel:
+  // { uploadMaxMb, maxExecutionTime, memoryLimitMb, maxInputVars, maxInputTime }.
+  // null = defaults del nodo. memoryLimitMb se topa al límite del plan en la API.
+  phpSettings: text("php_settings"),
   // cloudflare_dns_id para poder borrar el registro via API al eliminar el proyecto
   cloudflareDnsId: text("cloudflare_dns_id"),
   sslStatus:   text("ssl_status", { enum: ["pending", "active", "error"] }).notNull().default("pending"),
