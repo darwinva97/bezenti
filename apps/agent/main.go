@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -144,6 +146,7 @@ type clientStat struct {
 type heartbeatBody struct {
 	NodeID       string       `json:"nodeId"`
 	AgentURL     string       `json:"agentUrl,omitempty"`
+	PublicIP     string       `json:"publicIp,omitempty"`
 	CpuPct       float64      `json:"cpuPct"`
 	RamUsedMb    int          `json:"ramUsedMb"`
 	DiskUsedGb   float64      `json:"diskUsedGb"`
@@ -156,6 +159,7 @@ func sendHeartbeat(controlPlaneURL, nodeID, token string) {
 	body := heartbeatBody{
 		NodeID:       nodeID,
 		AgentURL:     discoverTunnelURL(),
+		PublicIP:     discoverPublicIP(),
 		CpuPct:       cpuPercent(),
 		RamUsedMb:    ramUsedMb(),
 		DiskUsedGb:   diskUsedGb("/"),
@@ -213,6 +217,39 @@ func discoverTunnelURL() string {
 		return ""
 	}
 	return "https://" + d.Hostname
+}
+
+// discoverPublicIP averigua la IP pública del nodo (la que ve internet) para
+// reportarla en el heartbeat. El control plane mantiene el wildcard DNS
+// *.pages/*.db apuntando a ella, de modo que si el proveedor (Hetzner)
+// reasigna IP al recrear el VPS, el DNS se corrige solo. Devuelve "" si no se
+// pudo determinar (el control plane conserva la IP previa).
+func discoverPublicIP() string {
+	client := &http.Client{Timeout: 4 * time.Second}
+
+	// Cloudflare trace devuelve, entre otras, una línea "ip=<ipv4>".
+	if resp, err := client.Get("https://cloudflare.com/cdn-cgi/trace"); err == nil {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		resp.Body.Close()
+		for _, line := range strings.Split(string(b), "\n") {
+			if strings.HasPrefix(line, "ip=") {
+				if ip := net.ParseIP(strings.TrimSpace(line[3:])); ip != nil && ip.To4() != nil {
+					return ip.String()
+				}
+			}
+		}
+	}
+
+	// Fallback: ipify devuelve solo la IP en texto plano.
+	if resp, err := client.Get("https://api.ipify.org"); err == nil {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 64))
+		resp.Body.Close()
+		if ip := net.ParseIP(strings.TrimSpace(string(b))); ip != nil && ip.To4() != nil {
+			return ip.String()
+		}
+	}
+
+	return ""
 }
 
 // ── Métricas del sistema ──────────────────────────────────────────────────────
