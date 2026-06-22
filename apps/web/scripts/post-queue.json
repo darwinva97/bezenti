@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "integrar-tienda-con-logistica",
-      "category": "ecommerce",
-      "topics": [
-        "ecommerce",
-        "automation"
-      ],
-      "es": "Cómo integrar tu tienda online con la logística de envíos",
-      "en": "How to connect your online store with shipping logistics"
-    },
-    {
       "key": "email-marketing-para-pymes",
       "category": "marketing",
       "topics": [
@@ -315,6 +305,17 @@
       "es": "Imágenes optimizadas: el truco para una web más rápida",
       "en": "Optimized images: the trick to a faster website",
       "publishedAt": "2026-06-21"
+    },
+    {
+      "key": "integrar-tienda-con-logistica",
+      "category": "ecommerce",
+      "topics": [
+        "ecommerce",
+        "automation"
+      ],
+      "es": "Cómo integrar tu tienda online con la logística de envíos",
+      "en": "How to connect your online store with shipping logistics",
+      "publishedAt": "2026-06-22"
     }
   ]
 }
