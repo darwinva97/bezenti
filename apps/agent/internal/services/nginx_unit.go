@@ -151,7 +151,25 @@ func (NginxUnit) RemoveListener(user, domain string) error {
 }
 
 func ensureVhostListener() error {
-	return unitPut("/config/listeners/*:80", map[string]any{"pass": "routes"})
+	return unitPut("/config/listeners/*:80", map[string]any{
+		"pass": "routes",
+		// El agente termina TLS en :443 y hace proxy a este :80 enviando
+		// X-Forwarded-Proto. Confiamos en ese header (solo desde localhost) para
+		// que Unit marque el request como https → PHP is_ssl()/$_SERVER['HTTPS']
+		// correctos. Sin esto WordPress entra en bucle de redirects en /wp-admin.
+		"forwarded": map[string]any{
+			"protocol": "X-Forwarded-Proto",
+			"source":   []string{"127.0.0.1", "::1"},
+		},
+	})
+}
+
+// EnsureBaseListener reaplica la config del listener *:80 (incluido `forwarded`).
+// Se llama al arrancar el agente para que los nodes ya existentes adopten la
+// confianza en X-Forwarded-Proto tras una actualización, sin esperar a que se
+// cree o renombre un proyecto.
+func (NginxUnit) EnsureBaseListener() error {
+	return ensureVhostListener()
 }
 
 func getRoutes() ([]any, error) {

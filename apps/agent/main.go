@@ -113,6 +113,14 @@ func main() {
 		})
 	})
 
+	// Reaplicar la config base del listener de Unit (confianza en
+	// X-Forwarded-Proto) de forma best-effort: así un node ya existente la adopta
+	// tras actualizar el agente. Idempotente; si Unit aún no responde, no pasa
+	// nada (se reaplica al crear/renombrar un proyecto).
+	if err := (services.NginxUnit{}).EnsureBaseListener(); err != nil {
+		slog.Warn("no se pudo reaplicar el listener base de Unit", "err", err)
+	}
+
 	// Heartbeat goroutine: informa al control plane que este nodo está vivo.
 	go heartbeatLoop(controlPlaneURL, nodeID, token)
 
@@ -309,6 +317,14 @@ func startTLSProxy() {
 	// vhost correcto (Unit termina HTTP plano; el TLS lo cierra este server).
 	upstream := &url.URL{Scheme: "http", Host: "127.0.0.1:80"}
 	proxy := httputil.NewSingleHostReverseProxy(upstream)
+	baseDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		baseDirector(req)
+		// Decirle a Unit/PHP que el cliente llegó por https (TLS lo terminamos
+		// aquí). Unit lo lee vía `forwarded` y marca is_ssl()/$_SERVER['HTTPS'].
+		req.Header.Set("X-Forwarded-Proto", "https")
+		req.Header.Set("X-Forwarded-Host", req.Host)
+	}
 
 	srv := &http.Server{
 		Addr:      ":443",

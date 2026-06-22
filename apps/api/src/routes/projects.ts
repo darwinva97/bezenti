@@ -205,7 +205,10 @@ projectsRouter.post("/:id/install", async (c) => {
   const dbId       = crypto.randomUUID();
   const dbName     = `${client.linuxUser}_${dbId.replace(/-/g, "").slice(0, 6)}`;
   const dbPassword = genPassword(24);
-  const scheme     = project.sslStatus === "active" ? "https" : "http";
+  // Los subdominios *.pages.bezenti.com tienen TLS automático (autocert en el
+  // agente termina https en :443); para dominios propios depende de sslStatus.
+  const hasTls     = project.domain.endsWith(`.${c.env.PAGES_DOMAIN}`) || project.sslStatus === "active";
+  const scheme     = hasTls ? "https" : "http";
   const siteUrl    = `${scheme}://${project.domain}`;
 
   // Llamada dedicada con timeout largo: instalar WordPress puede tardar.
