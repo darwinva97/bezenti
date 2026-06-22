@@ -265,6 +265,43 @@ projectsRouter.post("/:id/install", async (c) => {
   }, 201);
 });
 
+// Login 1-clic al admin de WordPress: el agente genera un token de un solo uso
+// (90 s) y devolvemos la URL mágica. Solo el dueño del proyecto puede pedirlo.
+projectsRouter.post("/:id/wp-login", async (c) => {
+  const user   = c.get("user");
+  const db     = createDb(c.env.DB);
+  const client = await getClient(db, user.id);
+  if (!client) return c.json({ error: "no hosting found" }, 404);
+  if (client.status !== "active") return c.json({ error: "Tu hosting está suspendido" }, 403);
+  if (!client.node?.agentUrl || !client.node?.agentToken) {
+    return c.json({ error: "El hosting no tiene node disponible" }, 409);
+  }
+
+  const project = await db.query.projects.findFirst({ where: eq(projects.id, c.req.param("id")) });
+  if (!project || project.clientId !== client.id) return c.json({ error: "not found" }, 404);
+  if (project.appType !== "wordpress") {
+    return c.json({ error: "Este proyecto no tiene WordPress instalado" }, 409);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${client.node.agentUrl}/projects/${project.id}/sso`, {
+      method:  "POST",
+      headers: { "X-Agent-Token": client.node.agentToken, "Content-Type": "application/json" },
+      signal:  AbortSignal.timeout(30000),
+    });
+  } catch (err) {
+    return c.json({ error: `No se pudo contactar al agente: ${err instanceof Error ? err.message : err}` }, 502);
+  }
+  if (!res.ok) {
+    return c.json({ error: `No se pudo generar el acceso: ${(await res.text()).slice(0, 300)}` }, 502);
+  }
+
+  const { token } = await res.json<{ token: string }>();
+  const scheme = project.domain.endsWith(`.${c.env.PAGES_DOMAIN}`) || project.sslStatus === "active" ? "https" : "http";
+  return c.json({ url: `${scheme}://${project.domain}/?bezenti_sso=${encodeURIComponent(token)}` });
+});
+
 // Renombrar el subdominio: recablea listeners en el agente, la app y los
 // archivos no se mueven (docPath queda como estaba).
 projectsRouter.patch("/:id/subdomain", async (c) => {

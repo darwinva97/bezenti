@@ -2,6 +2,8 @@ package services
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -47,9 +49,85 @@ func EnsureWpConfigSSL(path string) (bool, error) {
 	return true, nil
 }
 
-// RepairWpConfigsSSL recorre los wp-config.php de los proyectos y les añade el
-// snippet de https si falta. Best-effort; se llama al arrancar el agente para
-// curar instalaciones hechas antes de este fix.
+// ssoMuPlugin valida un token de un solo uso (?bezenti_sso=…) guardado como
+// transient por el agente y loguea al admin, para el acceso 1-clic desde el
+// panel. Va como must-use plugin (se carga siempre, no se puede desactivar).
+const ssoMuPlugin = `<?php
+/**
+ * Plugin Name: Bezenti SSO
+ * Description: Login 1-clic desde el panel Bezenti. Generado automáticamente — no editar.
+ */
+if ( ! defined( 'ABSPATH' ) ) { exit; }
+add_action( 'plugins_loaded', function () {
+	if ( empty( $_GET['bezenti_sso'] ) || is_user_logged_in() ) {
+		return;
+	}
+	$token = (string) $_GET['bezenti_sso'];
+	if ( strlen( $token ) < 24 ) {
+		return;
+	}
+	$key = 'bezenti_sso_' . hash( 'sha256', $token );
+	$uid = get_transient( $key );
+	if ( false === $uid ) {
+		return; // inválido o expirado
+	}
+	delete_transient( $key ); // un solo uso
+	$uid = (int) $uid;
+	if ( $uid <= 0 || ! get_user_by( 'id', $uid ) ) {
+		return;
+	}
+	wp_set_auth_cookie( $uid, false, true );
+	wp_set_current_user( $uid );
+	wp_safe_redirect( admin_url() );
+	exit;
+}, 1 );
+`
+
+// EnsureSSOMuPlugin instala/actualiza el mu-plugin de SSO en el docroot.
+func EnsureSSOMuPlugin(docRoot string) error {
+	dir := docRoot + "/wp-content/mu-plugins"
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(dir+"/bezenti-sso.php", []byte(ssoMuPlugin), 0o644)
+}
+
+// GenerateSSOToken crea un token de un solo uso (90 s) para login 1-clic: guarda
+// su hash como transient asociado al primer admin y devuelve el token en claro.
+// El control plane arma la URL https://<dominio>/?bezenti_sso=<token>.
+func (Installer) GenerateSSOToken(docRoot string) (string, error) {
+	if err := ensureWpCli(); err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(docRoot + "/wp-load.php"); err != nil {
+		return "", fmt.Errorf("no hay WordPress en este proyecto")
+	}
+	if err := EnsureSSOMuPlugin(docRoot); err != nil {
+		return "", err
+	}
+
+	out, err := exec.Command(wpCliPath, "--path="+docRoot, "--allow-root",
+		"user", "list", "--role=administrator", "--field=ID", "--format=ids").CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("wp user list: %s", strings.TrimSpace(string(out)))
+	}
+	ids := strings.Fields(strings.TrimSpace(string(out)))
+	if len(ids) == 0 {
+		return "", fmt.Errorf("el sitio no tiene usuario administrador")
+	}
+
+	token := randHex(32)
+	sum := sha256.Sum256([]byte(token))
+	if out, err := exec.Command(wpCliPath, "--path="+docRoot, "--allow-root",
+		"transient", "set", "bezenti_sso_"+hex.EncodeToString(sum[:]), ids[0], "90").CombinedOutput(); err != nil {
+		return "", fmt.Errorf("wp transient set: %s", strings.TrimSpace(string(out)))
+	}
+	return token, nil
+}
+
+// RepairWpConfigsSSL recorre los WordPress de los proyectos y se asegura de que
+// tengan el snippet de https en wp-config.php y el mu-plugin de SSO. Best-effort;
+// se llama al arrancar el agente para curar instalaciones previas a estos fixes.
 func RepairWpConfigsSSL() {
 	for _, pat := range []string{
 		"/var/www/*/*/public/wp-config.php",
@@ -61,6 +139,9 @@ func RepairWpConfigsSSL() {
 				slog.Warn("repair wp-config ssl", "path", p, "err", err)
 			} else if changed {
 				slog.Info("wp-config ssl reparado", "path", p)
+			}
+			if err := EnsureSSOMuPlugin(filepath.Dir(p)); err != nil {
+				slog.Warn("repair sso mu-plugin", "path", p, "err", err)
 			}
 		}
 	}
@@ -161,6 +242,11 @@ func (Installer) InstallWordPress(o WordPressOpts) error {
 		"--skip-email",
 	); err != nil {
 		return err
+	}
+
+	// mu-plugin de SSO para el login 1-clic desde el panel.
+	if err := EnsureSSOMuPlugin(docRoot); err != nil {
+		return fmt.Errorf("instalando mu-plugin SSO: %w", err)
 	}
 
 	// Los archivos quedan de root al correr con --allow-root; devolverlos al

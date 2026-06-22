@@ -82,6 +82,8 @@ func main() {
 			r.Post("/{projectID}/hosts", handlers.SetProjectHosts)
 			// Instalador 1-clic (WordPress y otras apps PHP)
 			r.Post("/{projectID}/install", handlers.InstallApp)
+			// Login 1-clic al admin de WordPress (token de un solo uso)
+			r.Post("/{projectID}/sso", handlers.ProjectSSO)
 		})
 
 		// Bases de datos independientes del cliente
