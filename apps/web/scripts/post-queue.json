@@ -2,15 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "copias-de-seguridad-de-tu-web",
-      "category": "servers",
-      "topics": [
-        "hosting"
-      ],
-      "es": "Copias de seguridad de tu web: por qué y cada cuánto",
-      "en": "Website backups: why you need them and how often"
-    },
-    {
       "key": "automatizar-seguimiento-de-leads",
       "category": "automation",
       "topics": [
@@ -318,6 +309,16 @@
       "es": "Qué es GEO: posicionarte en las respuestas de la IA",
       "en": "What GEO is: showing up in AI answers",
       "publishedAt": "2026-06-24"
+    },
+    {
+      "key": "copias-de-seguridad-de-tu-web",
+      "category": "servers",
+      "topics": [
+        "hosting"
+      ],
+      "es": "Copias de seguridad de tu web: por qué y cada cuánto",
+      "en": "Website backups: why you need them and how often",
+      "publishedAt": "2026-06-25"
     }
   ]
 }
