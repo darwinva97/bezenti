@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "automatizar-seguimiento-de-leads",
-      "category": "automation",
-      "topics": [
-        "automation",
-        "marketing"
-      ],
-      "es": "Cómo automatizar el seguimiento de tus leads sin perder el trato",
-      "en": "How to automate lead follow-up without losing the personal touch"
-    },
-    {
       "key": "migrar-de-wix-a-web-propia",
       "category": "web",
       "topics": [
@@ -319,6 +309,17 @@
       "es": "Copias de seguridad de tu web: por qué y cada cuánto",
       "en": "Website backups: why you need them and how often",
       "publishedAt": "2026-06-25"
+    },
+    {
+      "key": "automatizar-seguimiento-de-leads",
+      "category": "automation",
+      "topics": [
+        "automation",
+        "marketing"
+      ],
+      "es": "Cómo automatizar el seguimiento de tus leads sin perder el trato",
+      "en": "How to automate lead follow-up without losing the personal touch",
+      "publishedAt": "2026-06-26"
     }
   ]
 }
