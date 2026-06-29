@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "accesibilidad-web-por-que-importa",
-      "category": "web",
-      "topics": [
-        "performance",
-        "seo"
-      ],
-      "es": "Accesibilidad web: por qué importa y cómo empezar",
-      "en": "Web accessibility: why it matters and how to start"
-    },
-    {
       "key": "vender-en-redes-vs-tienda-propia",
       "category": "ecommerce",
       "topics": [
@@ -322,6 +312,17 @@
       "es": "Cómo medir si tu web está dando resultados",
       "en": "How to measure whether your website is delivering results",
       "publishedAt": "2026-06-28"
+    },
+    {
+      "key": "accesibilidad-web-por-que-importa",
+      "category": "web",
+      "topics": [
+        "performance",
+        "seo"
+      ],
+      "es": "Accesibilidad web: por qué importa y cómo empezar",
+      "en": "Web accessibility: why it matters and how to start",
+      "publishedAt": "2026-06-29"
     }
   ]
 }
