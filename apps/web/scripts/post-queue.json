@@ -2,16 +2,6 @@
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
   "pending": [
     {
-      "key": "vender-en-redes-vs-tienda-propia",
-      "category": "ecommerce",
-      "topics": [
-        "ecommerce",
-        "marketing"
-      ],
-      "es": "Vender por redes o tener tienda propia: ventajas de cada una",
-      "en": "Selling on social vs your own store: the upside of each"
-    },
-    {
       "key": "vps-cuando-pasar-a-servidor-propio",
       "category": "servers",
       "topics": [
@@ -323,6 +313,17 @@
       "es": "Accesibilidad web: por qué importa y cómo empezar",
       "en": "Web accessibility: why it matters and how to start",
       "publishedAt": "2026-06-29"
+    },
+    {
+      "key": "vender-en-redes-vs-tienda-propia",
+      "category": "ecommerce",
+      "topics": [
+        "ecommerce",
+        "marketing"
+      ],
+      "es": "Vender por redes o tener tienda propia: ventajas de cada una",
+      "en": "Selling on social vs your own store: the upside of each",
+      "publishedAt": "2026-06-30"
     }
   ]
 }
