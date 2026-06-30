@@ -19,7 +19,6 @@ import { metricsRouter }   from "./routes/metrics";
 import { agentRouter }           from "./routes/agent";
 import { providersRouter }       from "./routes/providers";
 import { provisionRouter, bootstrapScriptHandler } from "./routes/provision";
-import { adminMailRouter }     from "./routes/admin-mail"; // TEMPORAL — quitar tras configurar SMTP_PASSWORD
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -75,7 +74,6 @@ app.get("/admin/users", async (c) => {
 
 // Provision va antes del nodes router para que /provision no sea capturado como /:id
 app.route("/admin/nodes/provision", provisionRouter);
-app.route("/admin/mail",     adminMailRouter); // TEMPORAL — quitar tras configurar SMTP_PASSWORD
 app.route("/admin/nodes",    nodesRouter);
 app.route("/admin/providers", providersRouter);
 app.route("/admin/clients",  clientsRouter);
