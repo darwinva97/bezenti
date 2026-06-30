@@ -41,6 +41,14 @@
     // (secret) sobre CF_ZONE_ID.
     "EMAIL_DOMAIN":     "bezenti.com",
     "MAIL_HOST":        "mail.bezenti.com",
-    "CF_ZONE_ID":       "a8b5a5e1026f202add1fbf8aac824170"
+    "CF_ZONE_ID":       "a8b5a5e1026f202add1fbf8aac824170",
+    // SMTP del sistema para correos transaccionales (reset de contraseña).
+    // Buzón real en Stalwart. La contraseña va como SECRETO:
+    // `wrangler secret put SMTP_PASSWORD`. SMTP_SECURE "true" = TLS (465).
+    "SMTP_HOST":        "mail.bezenti.com",
+    "SMTP_PORT":        "465",
+    "SMTP_SECURE":      "true",
+    "SMTP_USER":        "noreply@bezenti.com",
+    "SMTP_FROM":        "Bezenti <noreply@bezenti.com>"
   }
 }

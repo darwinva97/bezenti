@@ -56,7 +56,12 @@ function LoginPage() {
             {loading ? "Ingresando..." : "Ingresar"}
           </button>
         </form>
-        <p className="text-sm text-gray-500 mt-6 text-center">
+        <p className="text-sm text-gray-500 mt-4 text-center">
+          <Link to="/forgot-password" className="text-blue-600 font-medium hover:underline">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
+        <p className="text-sm text-gray-500 mt-2 text-center">
           ¿No tienes cuenta?{" "}
           <Link to="/register" className="text-blue-600 font-medium hover:underline">
             Regístrate

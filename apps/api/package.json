@@ -15,7 +15,8 @@
     "@bezenti/db":   "workspace:*",
     "drizzle-orm":   "^0.44.2",
     "hono":          "^4.7.11",
-    "ssh2":          "^1.16.0"
+    "ssh2":          "^1.16.0",
+    "worker-mailer": "^1.2.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",

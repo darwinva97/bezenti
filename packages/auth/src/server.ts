@@ -6,10 +6,21 @@ import * as schema from "@bezenti/db/schema";
 
 export type AuthInstance = ReturnType<typeof createAuth>;
 
+export interface ResetPasswordRequest {
+  user:  { email: string; name?: string | null };
+  url:   string;   // enlace de un solo uso → /api/auth/reset-password/<token>?callbackURL=...
+  token: string;
+}
+
 export function createAuth(db: Db, options?: {
   trustedOrigins?: string[];
   baseUrl?: string;
+  // Transporte de correo inyectado (el paquete auth no conoce SMTP/Stalwart).
+  // Sin esto, el flujo de "olvidé mi contraseña" no envía nada.
+  sendResetPassword?: (data: ResetPasswordRequest) => Promise<void>;
 }) {
+  const sendReset = options?.sendResetPassword;
+
   return betterAuth({
     baseURL:        options?.baseUrl ?? "http://localhost:8787",
     trustedOrigins: options?.trustedOrigins ?? ["http://localhost:3001"],
@@ -27,6 +38,13 @@ export function createAuth(db: Db, options?: {
     emailAndPassword: {
       enabled:          true,
       requireEmailVerification: false, // habilitar en producción con Resend/etc
+      // Flujo "olvidé mi contraseña": better-auth genera el token de un solo
+      // uso y nos entrega la URL; el envío real lo hace el transporte inyectado.
+      // El token caduca en 1 hora (valor por defecto de better-auth).
+      sendResetPassword: sendReset
+        ? async ({ user, url, token }) =>
+            sendReset({ user: { email: user.email, name: user.name }, url, token })
+        : undefined,
     },
 
     plugins: [

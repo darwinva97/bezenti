@@ -8,6 +8,14 @@ export type Env = {
   // Stalwart Mail Server (v0.16, API JMAP en POST /jmap)
   STALWART_URL:      string;   // ej: https://mail.bezenti.com
   STALWART_TOKEN:    string;   // "usuario:contraseña" (Basic) o API key (Bearer)
+  // SMTP del sistema para correos transaccionales (reset de contraseña).
+  // Apunta a un buzón real de Stalwart, ej: noreply@bezenti.com.
+  SMTP_HOST:         string;   // ej: mail.bezenti.com
+  SMTP_PORT:         string;   // "465" (TLS implícito) | "587" (STARTTLS)
+  SMTP_SECURE?:      string;   // "true" => TLS implícito; "false" => STARTTLS
+  SMTP_USER:         string;   // ej: noreply@bezenti.com
+  SMTP_PASSWORD:     string;   // secret — wrangler secret put SMTP_PASSWORD
+  SMTP_FROM?:        string;   // ej: "Bezenti <noreply@bezenti.com>"
   // Correos corporativos: el dominio de buzones de un cliente es
   // <accountSlug>.<EMAIL_DOMAIN>; MAIL_HOST es el MX/IMAP/SMTP.
   EMAIL_DOMAIN:      string;   // ej: "bezenti.com"

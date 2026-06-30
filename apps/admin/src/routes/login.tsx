@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { authClient } from "../lib/auth";
 
@@ -63,6 +63,11 @@ function LoginPage() {
             {loading ? "Ingresando..." : "Ingresar"}
           </button>
         </form>
+        <p className="text-sm text-gray-500 mt-6 text-center">
+          <Link to="/forgot-password" className="text-blue-600 font-medium hover:underline">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
       </div>
     </div>
   );

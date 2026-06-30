@@ -80,6 +80,9 @@ importers:
       ssh2:
         specifier: ^1.16.0
         version: 1.17.0(patch_hash=a111a8ad787bee6971752e3e8f403a7da305d3dacd213f86218bad15deed3e14)
+      worker-mailer:
+        specifier: ^1.2.1
+        version: 1.2.1
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20250525.0
