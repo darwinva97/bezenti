@@ -93,6 +93,8 @@ func main() {
 			r.Post("/", handlers.CreateDatabase)
 			r.Post("/query", handlers.DatabaseQuery)
 			r.Post("/password", handlers.SetDatabasePassword)
+			// Login 1-clic al gestor web (Adminer) con token de un solo uso
+			r.Post("/adminer-login", handlers.AdminerLogin)
 			r.Delete("/{dbName}", handlers.DeleteDatabase)
 		})
 
@@ -128,6 +130,15 @@ func main() {
 	// Curar wp-config.php de instalaciones previas para que detecten https
 	// reenviado por el proxy TLS (evita el bucle de redirects en wp-admin).
 	services.RepairWpConfigsSSL()
+
+	// Dejar Adminer (gestor web de BD) instalado y ruteado en dbadmin.<PAGES>.
+	// En goroutine: el Ensure puede hacer apt-get/curl y no debe retrasar que el
+	// agente empiece a escuchar. Best-effort; también se reintenta en cada login.
+	go func() {
+		if err := (services.Adminer{}).Ensure(); err != nil {
+			slog.Warn("no se pudo preparar Adminer", "err", err)
+		}
+	}()
 
 	// Heartbeat goroutine: informa al control plane que este nodo está vivo.
 	go heartbeatLoop(controlPlaneURL, nodeID, token)

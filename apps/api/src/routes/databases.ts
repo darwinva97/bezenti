@@ -141,6 +141,43 @@ databasesRouter.post("/:id/password", async (c) => {
   return c.json({ ok: true, password });
 });
 
+// Login 1-clic al gestor web (Adminer): el agente prepara Adminer y devuelve
+// una URL con un token de un solo uso que inyecta las credenciales de la BD.
+databasesRouter.post("/:id/adminer-login", async (c) => {
+  const userId   = c.get("user").id;
+  const db       = createDb(c.env.DB);
+  const database = await db.query.clientDatabases.findFirst({
+    where: eq(clientDatabases.id, c.req.param("id")),
+  });
+  if (!database) return c.json({ error: "not found" }, 404);
+
+  const client = await getClient(db, userId);
+  if (!client || database.clientId !== client.id) return c.json({ error: "forbidden" }, 403);
+  if (!client.node?.agentUrl || !client.node?.agentToken) {
+    return c.json({ error: "El hosting no tiene node disponible" }, 409);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${client.node.agentUrl}/databases/adminer-login`, {
+      method:  "POST",
+      headers: { "X-Agent-Token": client.node.agentToken, "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        engine:   database.engine,
+        server:   "127.0.0.1",
+        db_name:  database.dbName,
+        db_user:  database.dbUser,
+        password: database.dbPasswordHash, // credencial real de la BD
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch (err) {
+    return c.json({ error: `No se pudo contactar al agente: ${err instanceof Error ? err.message : err}` }, 502);
+  }
+  if (!res.ok) return c.json({ error: `El agente respondió ${res.status}` }, 502);
+  return c.json(await res.json());
+});
+
 databasesRouter.delete("/:id", async (c) => {
   const userId   = c.get("user").id;
   const db       = createDb(c.env.DB);

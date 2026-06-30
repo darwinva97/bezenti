@@ -76,6 +76,24 @@ function DatabasesPage() {
     }
   }
 
+  async function openAdminer(d: Database) {
+    // Abrir la pestaña ANTES del await para no chocar con el bloqueador de
+    // pop-ups; luego se le fija la URL de login 1-clic que devuelve la API.
+    const win = window.open("", "_blank");
+    setBusy(d.id);
+    setError(null);
+    try {
+      const { url } = await api<{ url: string }>(`/portal/databases/${d.id}/adminer-login`, { method: "POST" });
+      if (win) win.location.href = url;
+      else window.location.href = url;
+    } catch (err) {
+      if (win) win.close();
+      setError(err instanceof Error ? err.message : "No se pudo abrir el gestor de BD");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function remove(d: Database) {
     if (!confirm(`¿Eliminar la base de datos "${d.dbName}"? Se borra con todos sus datos.`)) return;
     setBusy(d.id);
@@ -145,6 +163,13 @@ function DatabasesPage() {
                   <td className="px-4 py-3 font-mono text-gray-600">{d.dbUser}</td>
                   <td className="px-4 py-3 text-gray-600 capitalize">{d.engine}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <button
+                      onClick={() => openAdminer(d)}
+                      disabled={busy === d.id}
+                      className="text-sm text-blue-600 hover:text-blue-700 mr-3 disabled:opacity-50"
+                    >
+                      {busy === d.id ? "Abriendo…" : "Abrir gestor"}
+                    </button>
                     <button
                       onClick={() => setTestDb(d)}
                       className="text-sm text-blue-600 hover:text-blue-700 mr-3"

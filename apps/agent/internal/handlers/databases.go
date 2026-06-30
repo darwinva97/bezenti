@@ -160,6 +160,41 @@ func SetDatabasePassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// AdminerLogin prepara el gestor web (Adminer) y devuelve una URL de login
+// 1-clic con un token de un solo uso que inyecta las credenciales de la BD.
+func AdminerLogin(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Engine   string `json:"engine"`
+		Server   string `json:"server"`
+		DBName   string `json:"db_name"`
+		DBUser   string `json:"db_user"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.DBName == "" || req.DBUser == "" {
+		http.Error(w, "db_name y db_user son requeridos", http.StatusBadRequest)
+		return
+	}
+	server := req.Server
+	if server == "" {
+		server = "127.0.0.1"
+	}
+	if err := (services.Adminer{}).Ensure(); err != nil {
+		http.Error(w, "no se pudo preparar el gestor de BD: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	u, err := (services.Adminer{}).LoginURL(req.Engine, server, req.DBName, req.DBUser, req.Password)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"url": u})
+}
+
 // DeleteDatabase elimina una BD y su usuario. El usuario va como query ?user=.
 func DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	dbName := chi.URLParam(r, "dbName")
