@@ -17,13 +17,16 @@ import (
 // Adminer instala y sirve Adminer (un único archivo PHP que habla MySQL y
 // PostgreSQL) como gestor web de bases de datos compartido del nodo. Se publica
 // en dbadmin.<PAGES_DOMAIN> (reusa el wildcard TLS y DNS). El login es 1-clic:
-// el portal pide una URL con un token de un solo uso que inyecta las
-// credenciales de la BD en la sesión PHP (sin que el usuario teclee nada).
+// el portal pide una URL con un token de un solo uso; el wrapper auto-envía el
+// form de login de Adminer con esas credenciales (sin que el usuario teclee nada).
 type Adminer struct{}
 
 const (
-	adminerDir     = "/opt/bezenti/adminer"
-	adminerTokens  = "/var/lib/bezenti-agent/adminer"
+	adminerDir = "/opt/bezenti/adminer"
+	// Los tokens NO pueden ir bajo /var/lib/bezenti-agent (0700 root): la app PHP
+	// corre como www-data y no podría atravesar ese dir para leerlos. Dir propio
+	// bajo /var/lib (0755, atravesable) y con owner www-data.
+	adminerTokens  = "/var/lib/bezenti-adminer"
 	adminerAppKey  = "bzadminer"
 	adminerSrcURL  = "https://github.com/vrana/adminer/releases/download/v4.8.1/adminer-4.8.1.php"
 	adminerRunUser = "www-data"
@@ -60,16 +63,8 @@ func (Adminer) Ensure() error {
 		return err
 	}
 
-	// Secreto estable por nodo (cifra el "permanent login" de Adminer).
-	secret := adminerDir + "/.secret"
-	if _, err := os.Stat(secret); err != nil {
-		if err := os.WriteFile(secret, []byte(randHex(32)), 0o640); err != nil {
-			return err
-		}
-	}
-	chownTo(secret, adminerRunUser)
-
-	// Carpeta de tokens de un solo uso, legible por el usuario de la app PHP.
+	// Carpeta de tokens de un solo uso, legible por el usuario de la app PHP
+	// (owner www-data; el padre /var/lib es 0755, atravesable).
 	if err := os.MkdirAll(adminerTokens, 0o750); err != nil {
 		return err
 	}
@@ -161,63 +156,62 @@ func chownTo(path, username string) {
 	_ = os.Chown(path, uid, gid)
 }
 
-// adminerWrapper es el index.php que sirve Adminer con login 1-clic. Un token
-// de un solo uso (?bz=) carga las credenciales en la sesión PHP; a partir de ahí
-// Adminer queda autenticado para esa sesión sin pedir nada. Sin token, Adminer
-// funciona normal (login manual con las credenciales de la BD).
+// adminerWrapper es el index.php que sirve Adminer con login 1-clic. Un token de
+// un solo uso (?bz=) trae las credenciales de la BD; el wrapper AUTO-ENVÍA el
+// formulario de login de Adminer (POST auth[...]) con el token CSRF de la sesión
+// (mismo esquema que get_token() de Adminer), de modo que Adminer hace su login
+// normal y queda autenticado. Inyectar credenciales por sesión + override de
+// credentials() NO basta: Adminer solo autentica vía su POST de login. Sin
+// token, Adminer funciona normal (login manual con las credenciales de la BD).
 const adminerWrapper = `<?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+$BZ = null;
 if (!empty($_GET['bz'])) {
     $tok = preg_replace('/[^a-f0-9]/', '', (string) $_GET['bz']);
     if ($tok !== '') {
-        $f = '/var/lib/bezenti-agent/adminer/' . hash('sha256', $tok) . '.json';
+        $f = '/var/lib/bezenti-adminer/' . hash('sha256', $tok) . '.json';
         if (is_file($f)) {
             $data = json_decode(file_get_contents($f), true);
             @unlink($f); // un solo uso
             if (is_array($data) && ($data['exp'] ?? 0) >= time()) {
-                $_SESSION['bz'] = $data;
+                $BZ = $data;
             }
         }
     }
 }
-$BZ = $_SESSION['bz'] ?? null;
-
+if ($BZ && empty($_POST['auth'])) {
+    $driver = !empty($_GET['pgsql']) ? 'pgsql' : 'server';
+    // Mismo esquema que get_token() de Adminer: token aleatorio en la sesión.
+    // Al llegar el POST, Adminer lee el mismo $_SESSION['token'] y verify_token pasa.
+    if (empty($_SESSION['token'])) {
+        $_SESSION['token'] = mt_rand(1, 1000000);
+    }
+    $csrf = $_SESSION['token'];
+    $he = function ($s) { return htmlspecialchars((string) $s, ENT_QUOTES); };
+    $action = '/?' . $driver . '=' . urlencode($BZ['server'])
+        . '&username=' . urlencode($BZ['username'])
+        . '&db=' . urlencode($BZ['db']);
+    echo '<!doctype html><meta charset="utf-8"><title>Entrando…</title>';
+    echo '<form id="l" method="post" action="' . $he($action) . '">';
+    echo '<input type="hidden" name="auth[driver]" value="' . $driver . '">';
+    echo '<input type="hidden" name="auth[server]" value="' . $he($BZ['server']) . '">';
+    echo '<input type="hidden" name="auth[username]" value="' . $he($BZ['username']) . '">';
+    echo '<input type="hidden" name="auth[password]" value="' . $he($BZ['password']) . '">';
+    echo '<input type="hidden" name="auth[db]" value="' . $he($BZ['db']) . '">';
+    echo '<input type="hidden" name="token" value="' . $he($csrf) . '">';
+    echo '</form><script>document.getElementById("l").submit()</script>';
+    echo '<noscript><button form="l">Entrar</button></noscript>';
+    exit;
+}
 function adminer_object() {
-    global $BZ;
     class AdminerBezenti extends Adminer {
         function name() {
             return 'Bezenti · Bases de datos';
         }
-        function credentials() {
-            global $BZ;
-            if ($BZ) {
-                return array($BZ['server'], $BZ['username'], $BZ['password']);
-            }
-            return parent::credentials();
-        }
-        function login($login, $password) {
-            global $BZ;
-            if ($BZ) {
-                return true;
-            }
-            return parent::login($login, $password);
-        }
-        function database() {
-            global $BZ;
-            if ($BZ && !empty($BZ['db'])) {
-                return $BZ['db'];
-            }
-            return parent::database();
-        }
-        function permanentLogin($create = false) {
-            $s = @file_get_contents('/opt/bezenti/adminer/.secret');
-            return $s !== false ? trim($s) : 'bezenti';
-        }
     }
     return new AdminerBezenti;
 }
-
 include __DIR__ . '/adminer.php';
 `
