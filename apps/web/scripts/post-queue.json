@@ -1,17 +1,6 @@
 {
   "_comment": "Cola del bot de posts diarios. Cada día toma pending[0], genera el artículo (es+en) con Workers AI, y lo mueve a used. Cuando pending se vacíe, añade más items aquí (key kebab único, category del enum, topics del enum).",
-  "pending": [
-    {
-      "key": "ia-en-tu-negocio-por-donde-empezar",
-      "category": "automation",
-      "topics": [
-        "automation",
-        "systems"
-      ],
-      "es": "Inteligencia artificial en tu negocio: por dónde empezar de verdad",
-      "en": "AI in your business: where to actually start"
-    }
-  ],
+  "pending": [],
   "used": [
     {
       "key": "que-es-el-seo-local",
@@ -325,6 +314,17 @@
       "es": "VPS: cuándo conviene pasar a tu propio servidor",
       "en": "VPS: when it makes sense to move to your own server",
       "publishedAt": "2026-07-01"
+    },
+    {
+      "key": "ia-en-tu-negocio-por-donde-empezar",
+      "category": "automation",
+      "topics": [
+        "automation",
+        "systems"
+      ],
+      "es": "Inteligencia artificial en tu negocio: por dónde empezar de verdad",
+      "en": "AI in your business: where to actually start",
+      "publishedAt": "2026-07-02"
     }
   ]
 }
